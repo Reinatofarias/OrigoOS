@@ -1,29 +1,16 @@
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { db, keyProblem } from '@/lib/db';
+import { chaveEmUso, chaves, db, keyProblem } from '@/lib/db';
 import { Body, Card, PageHeader } from '@/components/ui';
 
 // Diagnóstico da conexão com o Supabase: qual projeto, que tipo de chave e quantos registros cada tabela tem.
 // Não mostra a chave em si.
 const TABELAS = ['clients', 'leads', 'tasks', 'routine_checks', 'charges', 'expenses'];
 
-function tipoDaChave() {
-  const key = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const origem = process.env.SUPABASE_SECRET_KEY ? 'SUPABASE_SECRET_KEY' : process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SUPABASE_SERVICE_ROLE_KEY' : '—';
-  if (!key) return { origem, tipo: 'nenhuma' };
-  if (key.startsWith('sb_secret_')) return { origem, tipo: 'secret (nova)' };
-  if (key.startsWith('sb_publishable_')) return { origem, tipo: 'publishable (pública)' };
-  try {
-    return { origem, tipo: `JWT legada, papel "${JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString()).role}"` };
-  } catch {
-    return { origem, tipo: 'formato desconhecido' };
-  }
-}
-
 export default async function StatusPage() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
   const projeto = url.replace(/^https?:\/\//, '').split('.')[0] || '—';
-  const chave = tipoDaChave();
   const problema = keyProblem();
+  const emUso = chaveEmUso();
   const contagens = url
     ? await Promise.all(
         TABELAS.map(async (t) => {
@@ -35,8 +22,13 @@ export default async function StatusPage() {
 
   const linhas: [string, string, boolean][] = [
     ['Projeto do Supabase', projeto, projeto === 'kcrrpppbnaqyfvxyeocq'],
-    ['Variável da chave', chave.origem, chave.origem !== '—'],
-    ['Tipo da chave', chave.tipo, !problema],
+    ...chaves().map(
+      (c): [string, string, boolean] => [
+        c.nome,
+        c.tipo ? `${c.tipo}${c.nome === emUso ? ' (em uso)' : ''}` : 'não configurada',
+        c.tipo === 'secret' || c.tipo === 'service_role',
+      ],
+    ),
   ];
 
   return (
@@ -48,7 +40,7 @@ export default async function StatusPage() {
             {linhas.map(([k, v, ok]) => (
               <li key={k} className="flex items-center gap-2">
                 {ok ? <CheckCircle2 size={16} className="text-success" /> : <XCircle size={16} className="text-danger" />}
-                <span className="w-44 text-muted">{k}</span>
+                <span className="w-60 text-muted">{k}</span>
                 <span className="font-semibold">{v}</span>
               </li>
             ))}
