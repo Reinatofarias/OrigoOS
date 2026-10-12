@@ -43,6 +43,9 @@ export default async function ClientesPage() {
       <PageHeader title="Clientes" subtitle={`${ativos.length} ativos`}>
         <FormDialog label="Novo cliente" title="Novo cliente" action={addClient}>
           <ClientFields />
+          <label className="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" name="onboarding" defaultChecked className="size-4 accent-[var(--brand)]" /> Criar o checklist de onboarding
+          </label>
         </FormDialog>
       </PageHeader>
       <Body>

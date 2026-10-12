@@ -1,18 +1,24 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { AtSign, MapPin, MessageCircle, Tag, Building2 } from 'lucide-react';
-import { db, type Lead } from '@/lib/db';
+import { AtSign, MapPin, MessageCircle, Tag, Building2, FileText, Plus } from 'lucide-react';
+import { db, type Lead, type Proposal } from '@/lib/db';
+import { STATUS_PROPOSTA, numeroProposta, totais } from '@/lib/propostas';
+import { novaProposta } from '@/app/actions';
 import { today, prazo } from '@/lib/dates';
 import { brl } from '@/lib/format';
 import { NICHO, formatWhatsapp } from '@/lib/prospeccao';
-import { Avatar, Badge, Body, Card, PageHeader } from '@/components/ui';
+import { Avatar, Badge, Body, Card, PageHeader, btn } from '@/components/ui';
 import { Cadence, DealActions, DealField, DealNotes, StageBar } from '@/components/deal';
 
 export default async function NegocioPage({ params }: PageProps<'/comercial/[id]'>) {
   const { id } = await params;
-  const { data } = await db().from('leads').select('*').eq('id', id).maybeSingle();
+  const [{ data }, { data: props }] = await Promise.all([
+    db().from('leads').select('*').eq('id', id).maybeSingle(),
+    db().from('proposals').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
+  ]);
   if (!data) notFound();
   const lead = data as Lead;
+  const propostas = (props ?? []) as Proposal[];
   const hoje = today();
   const k = `${lead.id}-${lead.status}-${lead.updated_at}`;
 
@@ -47,10 +53,10 @@ export default async function NegocioPage({ params }: PageProps<'/comercial/[id]
       </div>
 
       <Body>
-        <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <div className="grid gap-6">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
             <Card title="Detalhes">
-              <div className="grid divide-y divide-line">
+              <div className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line">
                 <DealField key={`v-${k}`} lead={lead} campo="valor" label="Valor mensal" />
                 <DealField key={`c-${k}`} lead={lead} campo="contato" label="Contato" />
                 <DealField key={`ci-${k}`} lead={lead} campo="cidade" label="Cidade" />
@@ -106,7 +112,44 @@ export default async function NegocioPage({ params }: PageProps<'/comercial/[id]
             </Card>
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+            <Card
+              flush
+              title="Propostas"
+              aside={
+                <form action={novaProposta.bind(null, lead.id)}>
+                  <button className={btn.secondary}>
+                    <Plus size={14} /> Criar proposta
+                  </button>
+                </form>
+              }
+            >
+              {propostas.length ? (
+                <ul className="divide-y divide-line">
+                  {propostas.map((p) => {
+                    const t = totais(p.itens, p.desconto);
+                    return (
+                      <li key={p.id}>
+                        <Link href={`/propostas/${p.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/60">
+                          <FileText size={18} className="text-brand" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13.5px] font-semibold">Proposta Nº {numeroProposta(p.numero)}</span>
+                            <span className="block truncate text-[12px] text-muted">{p.itens.map((i) => i.nome).join(' + ') || 'Sem serviços'}</span>
+                          </span>
+                          <span className="text-right">
+                            <span className="block text-[13px] font-semibold tabular-nums">{brl(t.mensalFinal)}/mês</span>
+                            {t.unico > 0 && <span className="block text-[11.5px] text-muted">+ {brl(t.unico)} único</span>}
+                          </span>
+                          <Badge tone={STATUS_PROPOSTA[p.status].tone}>{STATUS_PROPOSTA[p.status].label}</Badge>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="px-4 py-5 text-center text-[13px] text-muted">Nenhuma proposta ainda. Crie uma com os serviços da Origo e mande o link pelo WhatsApp.</p>
+              )}
+            </Card>
             {lead.status !== 'fechou' && lead.status !== 'perdido' && (
               <Card title="Cadência de mensagens" aside="4 toques em 10 dias">
                 <Cadence key={k} lead={lead} />

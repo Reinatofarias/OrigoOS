@@ -165,3 +165,22 @@ dialog::backdrop {
 .scroll-thin {
   scrollbar-width: thin;
 }
+
+/* Proposta em PDF: só o documento, com as cores do fundo. */
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .proposta,
+  .proposta * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

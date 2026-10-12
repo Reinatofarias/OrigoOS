@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListChecks, KanbanSquare, Building2, Wallet, LogOut, Activity } from 'lucide-react';
+import { Home, ListChecks, KanbanSquare, Building2, Wallet, LogOut, Activity, Target, Settings } from 'lucide-react';
 import { logout } from '@/app/actions';
 import { Logo } from './logo';
 
@@ -12,6 +12,7 @@ const LINKS = [
   { href: '/comercial', label: 'Comercial', icon: KanbanSquare },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet },
+  { href: '/metas', label: 'Metas', icon: Target },
 ];
 
 function ativo(path: string, href: string) {
@@ -52,9 +53,14 @@ export default function Sidebar() {
               </div>
             </div>
           </div>
-          <Link href="/status" className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white">
-            <Activity size={16} /> Status da conexão
-          </Link>
+          <div className="grid">
+            <Link href="/configuracoes" aria-current={ativo(path, '/configuracoes') ? 'page' : undefined} className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white aria-[current=page]:text-white">
+              <Settings size={16} /> Configurações
+            </Link>
+            <Link href="/status" className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white">
+              <Activity size={16} /> Status da conexão
+            </Link>
+          </div>
           <form action={logout} className="-mt-3">
             <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white">
               <LogOut size={16} /> Sair
@@ -66,14 +72,19 @@ export default function Sidebar() {
       {/* Celular: barra de cima com a marca e barra de baixo com os módulos */}
       <header className="sticky top-0 z-30 flex items-center justify-between bg-sidebar px-4 py-3 md:hidden">
         <Logo height={28} />
+        <span className="flex items-center">
+        <Link href="/configuracoes" className="rounded-lg p-2 text-sidebar-ink" aria-label="Configurações">
+          <Settings size={18} />
+        </Link>
         <form action={logout}>
           <button className="rounded-lg p-2 text-sidebar-ink" aria-label="Sair">
             <LogOut size={18} />
           </button>
         </form>
+        </span>
       </header>
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         aria-label="Principal"
       >
         {LINKS.map(({ href, label, icon: Icon }) => (
@@ -81,7 +92,7 @@ export default function Sidebar() {
             key={href}
             href={href}
             aria-current={ativo(path, href) ? 'page' : undefined}
-            className="flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted aria-[current=page]:text-brand"
+            className="flex flex-col items-center gap-0.5 py-2 text-[10.5px] font-medium text-muted aria-[current=page]:text-brand"
           >
             <Icon size={20} strokeWidth={1.8} />
             {label}

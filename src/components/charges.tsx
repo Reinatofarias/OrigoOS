@@ -2,19 +2,34 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, RotateCcw, Trash2, Ban } from 'lucide-react';
-import { deleteCharge, setChargeStatus } from '@/app/actions';
+import { CheckCircle2, RotateCcw, Trash2, Ban, Send, ExternalLink } from 'lucide-react';
+import { deleteCharge, emitirNoAsaas, setChargeStatus } from '@/app/actions';
 import type { Charge } from '@/lib/db';
 import { FORMA, SITUACAO, brl, situacao } from '@/lib/format';
 import { formatShort } from '@/lib/dates';
 import { Badge, Empty } from './ui';
 
-function Acoes({ c }: { c: Charge }) {
+function Fatura({ c }: { c: Charge }) {
+  if (!c.asaas_url) return null;
+  return (
+    <a href={c.asaas_url} target="_blank" rel="noopener noreferrer" title="Abrir a fatura do Asaas" className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-semibold text-info hover:bg-info-soft">
+      <ExternalLink size={13} /> Fatura
+    </a>
+  );
+}
+
+function Acoes({ c, asaas }: { c: Charge; asaas?: boolean }) {
   const [forma, setForma] = useState<NonNullable<Charge['forma']>>('pix');
   const [pending, start] = useTransition();
+  const emitir = () =>
+    start(async () => {
+      const r = await emitirNoAsaas(c.id);
+      if (r.erro) alert(`Não emiti no Asaas: ${r.erro}`);
+    });
   if (c.status === 'pago' || c.status === 'cancelado') {
     return (
       <span className={`flex items-center justify-end gap-1 ${pending ? 'opacity-60' : ''}`}>
+        <Fatura c={c} />
         {c.status === 'pago' && c.forma && <span className="mr-1 text-[12px] text-muted">{FORMA[c.forma]}</span>}
         <button type="button" title="Voltar para aguardando" onClick={() => start(() => setChargeStatus(c.id, 'pendente'))} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-ink">
           <RotateCcw size={14} />
@@ -24,6 +39,12 @@ function Acoes({ c }: { c: Charge }) {
   }
   return (
     <span className={`flex items-center justify-end gap-1 ${pending ? 'opacity-60' : ''}`}>
+      <Fatura c={c} />
+      {asaas && !c.asaas_id && (
+        <button type="button" onClick={emitir} title="Emitir a cobrança no Asaas (Pix, boleto ou cartão)" className="inline-flex items-center gap-1 rounded-md bg-info-soft px-2 py-1 text-[12px] font-semibold text-info hover:opacity-80">
+          <Send size={12} /> Emitir
+        </button>
+      )}
       <select aria-label="Forma de pagamento" value={forma} onChange={(e) => setForma(e.target.value as typeof forma)} className="cell-input fit">
         {Object.entries(FORMA).map(([k, v]) => (
           <option key={k} value={k}>
@@ -53,11 +74,11 @@ function Acoes({ c }: { c: Charge }) {
   );
 }
 
-export function ChargeTable({ charges, hoje, nomes }: { charges: Charge[]; hoje: string; nomes?: Record<string, string> }) {
+export function ChargeTable({ charges, hoje, nomes, asaas }: { charges: Charge[]; hoje: string; nomes?: Record<string, string>; asaas?: boolean }) {
   if (!charges.length) return <Empty>Nenhuma cobrança nesse período.</Empty>;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-left text-[13px]">
+      <table className="w-full min-w-[780px] text-left text-[13px]">
         <thead className="border-b border-line bg-surface-2/50 text-[11.5px] text-muted">
           <tr>
             {nomes && <th className="px-4 py-2 font-medium">Cliente</th>}
@@ -86,9 +107,10 @@ export function ChargeTable({ charges, hoje, nomes }: { charges: Charge[]; hoje:
                 <td className="px-4 py-2.5">
                   <Badge tone={SITUACAO[s].tone}>{SITUACAO[s].label}</Badge>
                   {c.pago_em && <span className="ml-1.5 text-[11.5px] text-muted">em {formatShort(c.pago_em)}</span>}
+                  {c.asaas_id && c.status === 'pendente' && <span className="ml-1.5 text-[11.5px] text-info">no Asaas</span>}
                 </td>
                 <td className="px-4 py-2.5">
-                  <Acoes c={c} />
+                  <Acoes c={c} asaas={asaas} />
                 </td>
               </tr>
             );

@@ -4,6 +4,7 @@ import { addDays, today } from '@/lib/dates';
 import { Body, PageHeader } from '@/components/ui';
 import { TaskGroups } from '@/components/tasks';
 import ClientFilter from './client-filter';
+import { garantirRecorrentes } from '@/lib/modelos';
 
 const FILTROS = [
   { key: 'todas', label: 'Todas' },
@@ -18,6 +19,7 @@ export default async function TarefasPage({ searchParams }: PageProps<'/tarefas'
   const cliente = typeof sp.cliente === 'string' ? sp.cliente : '';
   const hoje = today();
   const supa = db();
+  await garantirRecorrentes(supa);
 
   let q = supa.from('tasks').select('*').order('data', { nullsFirst: false }).order('created_at');
   if (cliente) q = q.eq('client_id', cliente);
