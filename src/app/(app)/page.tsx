@@ -1,4 +1,4 @@
-import { db, type Client, type Lead, type Task } from '@/lib/db';
+import { db, keyProblem, type Client, type Lead, type Task } from '@/lib/db';
 import { addDays, formatDay, formatShort, today } from '@/lib/dates';
 import { DIA_BASE, notaDoDia, tarefasDeTrafego } from '@/lib/rotina';
 import QuickAdd from '@/components/quick-add';
@@ -23,7 +23,7 @@ export default async function HojePage() {
       supa.from('leads').select('*').eq('status', 'novo').order('ordem').limit(META_DIA),
     ]);
   const [{ data: tarefas }, { data: feitasHoje }, { data: clientes }, { data: checks }, { data: followups }, { data: novos }] = resultados;
-  const erroBanco = resultados.find((r) => r.error)?.error?.message;
+  const erroBanco = keyProblem() ?? resultados.find((r) => r.error)?.error?.message;
 
   const abertas = (tarefas ?? []) as Task[];
   const comData = abertas.filter((t) => t.data);
