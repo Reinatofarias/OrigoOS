@@ -14,8 +14,7 @@ export default async function HojePage() {
   const amanha = addDays(hoje, 1);
   const supa = db();
 
-  const [{ data: tarefas }, { data: feitasHoje }, { data: clientes }, { data: checks }, { data: followups }, { data: novos }] =
-    await Promise.all([
+  const resultados = await Promise.all([
       supa.from('tasks').select('*').eq('feita', false).or(`data.is.null,data.lte.${hoje}`).order('data', { nullsFirst: false }).order('created_at'),
       supa.from('tasks').select('*').eq('feita', true).gte('feita_em', `${hoje}T00:00:00-03:00`).order('feita_em'),
       supa.from('clients').select('*').eq('ativo', true).order('nome'),
@@ -23,6 +22,8 @@ export default async function HojePage() {
       supa.from('leads').select('*').in('status', ['m1', 'm2', 'm3', 'respondeu', 'call']).lte('proxima_acao', hoje).order('proxima_acao'),
       supa.from('leads').select('*').eq('status', 'novo').order('ordem').limit(META_DIA),
     ]);
+  const [{ data: tarefas }, { data: feitasHoje }, { data: clientes }, { data: checks }, { data: followups }, { data: novos }] = resultados;
+  const erroBanco = resultados.find((r) => r.error)?.error?.message;
 
   const abertas = (tarefas ?? []) as Task[];
   const comData = abertas.filter((t) => t.data);
@@ -37,6 +38,12 @@ export default async function HojePage() {
         <h1 className="font-display text-3xl font-extrabold">Bom dia, Renato</h1>
         <p className="text-muted">{notaDoDia(hoje)}</p>
       </header>
+
+      {erroBanco && (
+        <p className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm">
+          Não consegui ler o banco: {erroBanco}
+        </p>
+      )}
 
       <QuickAdd />
 
