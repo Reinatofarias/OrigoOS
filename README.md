@@ -1,18 +1,20 @@
 # Origo OS
 
-Sistema interno da Origo Company: tarefas do dia, rotina de tráfego dos clientes e funil de prospecção.
+Sistema interno da Origo Company: tarefas, funil comercial, clientes e financeiro.
 
 Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
 
 ## Telas
 
-- **Hoje** (`/`): tarefas do dia, tarefa rápida, rotina de tráfego do dia por cliente, follow-ups e novos leads do dia, rotina pessoal.
-- **Prospecção** (`/prospeccao`): funil por etapa (Novos, M1…M4, Respondeu, Call, Fechou, Sem interesse), mensagens M1–M4 prontas, botão de WhatsApp com a mensagem preenchida e cadastro de lead.
-- **Clientes** (`/clientes`): clientes ativos, semana do tráfego e checklists de Google e Meta.
+- **Início** (`/`): resumo do dia com tarefas de hoje, prospecção do dia, rotina de tráfego por cliente, cobranças da semana e rotina pessoal.
+- **Tarefas** (`/tarefas`): lista no estilo ClickUp, agrupada por status (A fazer, Em andamento, Concluído), com cliente, prazo e prioridade editáveis na linha.
+- **Comercial** (`/comercial`): funil no estilo Pipedrive, com quadro arrastável, lista e perdidos. Cada negócio (`/comercial/[id]`) tem barra de etapas, mensagens M1 a M4 com WhatsApp, anotações, Ganho/Perdido e "Transformar em cliente".
+- **Clientes** (`/clientes`): carteira no estilo Asaas, com receita recorrente, recebido, a receber e vencido. Cada cliente (`/clientes/[id]`) tem visão geral, cobranças, tarefas e dados cadastrais.
+- **Financeiro** (`/financeiro`): mês a mês, com mensalidades geradas automaticamente, baixa de pagamento, despesas e resultado.
 
 ## Instalação
 
-1. **Banco:** no Supabase, abra *SQL Editor*, cole o conteúdo de `supabase/instalar.sql` e rode. Isso cria as tabelas e cadastra os 5 clientes e os 25 leads iniciais.
+1. **Banco:** no Supabase, abra *SQL Editor*, cole o conteúdo de `supabase/instalar.sql` e rode. Isso cria as tabelas e cadastra os 5 clientes e os 25 leads iniciais. Quem já tinha a v1 instalada roda só `supabase/atualizar-v2.sql`.
 2. **Vercel:** importe este repositório e cadastre as variáveis de `.env.example`:
    - `SUPABASE_URL`: em Supabase > Settings > API (Project URL)
    - `SUPABASE_SECRET_KEY`: uma Secret key (sb_secret_...) em Supabase > Settings > API Keys. Nunca coloque no código. Se ela não existir, o app usa `SUPABASE_SERVICE_ROLE_KEY` (a que a integração Supabase + Vercel sincroniza).

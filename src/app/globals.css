@@ -1,34 +1,62 @@
 @import "tailwindcss";
 
+/* Cores da Origo: azul-ciano, violeta e magenta do logo, sobre um azul-marinho quase preto. */
 :root {
-  --bg: #f3f5f4;
+  --bg: #f5f6fa;
   --surface: #ffffff;
-  --ink: #14211d;
-  --muted: #5b6b66;
-  --line: #d9e1de;
-  --accent: #0f6b55;
-  --accent-ink: #ffffff;
-  --accent-soft: #e1f0eb;
-  --wa: #1c8d4e;
-  --warn: #9a5b00;
-  --warn-soft: #fbefd9;
-  --danger: #b42318;
+  --surface-2: #f1f2f8;
+  --ink: #14152e;
+  --muted: #6b6e8a;
+  --faint: #9a9cb5;
+  --line: #e5e7f0;
+  --brand: #6a4cff;
+  --brand-hover: #5a3cf0;
+  --brand-ink: #ffffff;
+  --brand-soft: #efebff;
+  --cyan: #1aa7e8;
+  --magenta: #d63fbf;
+  --success: #0f9a64;
+  --success-soft: #e3f6ee;
+  --warn: #b86e00;
+  --warn-soft: #fdf1dc;
+  --danger: #dc3a40;
+  --danger-soft: #fde8e9;
+  --info: #3a6bff;
+  --info-soft: #e7eeff;
+  --wa: #1c9d55;
+  --sidebar: #0b0c24;
+  --sidebar-ink: #b9bbdc;
+  --sidebar-hover: #17193a;
+  --grad: linear-gradient(135deg, #22c7ff 0%, #5b5bff 45%, #a23cff 72%, #e340c8 100%);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1513;
-    --surface: #17201d;
-    --ink: #e6eeeb;
-    --muted: #97a8a2;
-    --line: #2a3632;
-    --accent: #4fc3a1;
-    --accent-ink: #0b1311;
-    --accent-soft: #1c312b;
-    --wa: #3fbf77;
+    --bg: #0a0b1a;
+    --surface: #121429;
+    --surface-2: #191c36;
+    --ink: #e8e9f6;
+    --muted: #9a9dbd;
+    --faint: #6c6f91;
+    --line: #252846;
+    --brand: #8a6cff;
+    --brand-hover: #9b80ff;
+    --brand-ink: #ffffff;
+    --brand-soft: #231d48;
+    --cyan: #4cc4ff;
+    --magenta: #ef6bd6;
+    --success: #3fcf8e;
+    --success-soft: #12301f;
     --warn: #f0b357;
     --warn-soft: #33281a;
-    --danger: #f97066;
+    --danger: #ff6b70;
+    --danger-soft: #3a1a20;
+    --info: #7a9bff;
+    --info-soft: #1a2448;
+    --wa: #3fbf77;
+    --sidebar: #070816;
+    --sidebar-ink: #a9abcf;
+    --sidebar-hover: #14163a;
     color-scheme: dark;
   }
 }
@@ -36,18 +64,30 @@
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-line: var(--line);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-accent-soft: var(--accent-soft);
-  --color-wa: var(--wa);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-cyan: var(--cyan);
+  --color-magenta: var(--magenta);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-wa: var(--wa);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-hover: var(--sidebar-hover);
   --font-sans: var(--font-body);
-  --font-display: var(--font-display-face);
 }
 
 body {
@@ -56,6 +96,72 @@ body {
 }
 
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
+}
+
+.bg-grad {
+  background: var(--grad);
+}
+
+.text-grad {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@layer components {
+/* Campos "invisíveis" das linhas de tabela: só aparecem no hover/foco, como no ClickUp. */
+.cell-input {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: inherit;
+  max-width: 100%;
+}
+.cell-input:hover {
+  border-color: var(--line);
+}
+.cell-input.fit {
+  field-sizing: content;
+}
+.cell-input:focus {
+  border-color: var(--brand);
+  background: var(--surface);
+  outline: none;
+}
+
+.field {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.field:focus {
+  border-color: var(--brand);
+  outline: 2px solid var(--brand-soft);
+}
+
+/* Barra de etapas do funil, com setas como no Pipedrive. */
+.stage {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%);
+}
+.stage:first-child {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+}
+}
+
+dialog::backdrop {
+  background: rgb(10 11 26 / 0.45);
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
 }

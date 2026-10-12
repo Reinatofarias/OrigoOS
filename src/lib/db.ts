@@ -35,18 +35,33 @@ export type Client = {
   plataforma: 'google' | 'meta' | 'google_meta';
   mensalidade: number | null;
   ativo: boolean;
+  responsavel: string | null;
+  email: string | null;
+  telefone: string | null;
+  documento: string | null;
+  dia_vencimento: number;
+  inicio: string | null;
+  observacoes: string | null;
+  created_at: string;
 };
+
+export type TaskStatus = 'todo' | 'doing' | 'done';
+export type Prioridade = 'urgente' | 'alta' | 'normal' | 'baixa';
 
 export type Task = {
   id: string;
   titulo: string;
+  descricao: string | null;
   data: string | null;
   client_id: string | null;
+  status: TaskStatus;
+  prioridade: Prioridade;
   feita: boolean;
   feita_em: string | null;
+  created_at: string;
 };
 
-export type LeadStatus = 'novo' | 'm1' | 'm2' | 'm3' | 'm4' | 'respondeu' | 'call' | 'fechou' | 'perdido';
+export type LeadStatus = 'novo' | 'm1' | 'm2' | 'm3' | 'm4' | 'respondeu' | 'call' | 'proposta' | 'fechou' | 'perdido';
 
 export type Lead = {
   id: string;
@@ -57,8 +72,33 @@ export type Lead = {
   whatsapp: string | null;
   whatsapp_confirmado: boolean;
   instagram: string | null;
+  contato: string | null;
   status: LeadStatus;
   proxima_acao: string | null;
   ordem: number;
   notas: string | null;
+  valor: number;
+  client_id: string | null;
+  updated_at: string;
+};
+
+export type Charge = {
+  id: string;
+  client_id: string;
+  descricao: string;
+  valor: number;
+  vencimento: string;
+  competencia: string | null;
+  status: 'pendente' | 'pago' | 'cancelado';
+  pago_em: string | null;
+  forma: 'pix' | 'boleto' | 'transferencia' | 'cartao' | 'dinheiro' | null;
+};
+
+export type Expense = {
+  id: string;
+  descricao: string;
+  categoria: string;
+  valor: number;
+  data: string;
+  pago: boolean;
 };
