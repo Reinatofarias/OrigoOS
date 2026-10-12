@@ -42,6 +42,9 @@ export default function ClientFields({ c }: { c?: Partial<Client> }) {
       <Field label="E-mail">
         <input name="email" type="email" defaultValue={c?.email ?? ''} className="field" />
       </Field>
+      <Field label="Endereço" className="sm:col-span-2">
+        <input name="endereco" defaultValue={c?.endereco ?? ''} className="field" />
+      </Field>
       <Field label="Observações" className="sm:col-span-2">
         <textarea name="observacoes" rows={3} defaultValue={c?.observacoes ?? ''} className="field" />
       </Field>

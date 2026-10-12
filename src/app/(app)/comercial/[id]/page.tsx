@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { AtSign, MapPin, MessageCircle, Tag, Building2, FileText, Plus } from 'lucide-react';
-import { db, type Lead, type Proposal } from '@/lib/db';
+import { AtSign, MapPin, MessageCircle, Tag, Building2, FileText, Plus, FileSignature } from 'lucide-react';
+import { db, type Contract, type Lead, type Proposal } from '@/lib/db';
+import { STATUS_CONTRATO, numeroContrato } from '@/lib/contrato';
 import { STATUS_PROPOSTA, numeroProposta, totais } from '@/lib/propostas';
 import { novaProposta } from '@/app/actions';
 import { today, prazo } from '@/lib/dates';
@@ -12,10 +13,12 @@ import { Cadence, DealActions, DealField, DealNotes, StageBar } from '@/componen
 
 export default async function NegocioPage({ params }: PageProps<'/comercial/[id]'>) {
   const { id } = await params;
-  const [{ data }, { data: props }] = await Promise.all([
+  const [{ data }, { data: props }, { data: cts }] = await Promise.all([
     db().from('leads').select('*').eq('id', id).maybeSingle(),
     db().from('proposals').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
+    db().from('contracts').select('*').eq('lead_id', id).neq('status', 'cancelado').order('created_at', { ascending: false }),
   ]);
+  const contratos = (cts ?? []) as Contract[];
   if (!data) notFound();
   const lead = data as Lead;
   const propostas = (props ?? []) as Proposal[];
@@ -150,6 +153,21 @@ export default async function NegocioPage({ params }: PageProps<'/comercial/[id]
                 <p className="px-4 py-5 text-center text-[13px] text-muted">Nenhuma proposta ainda. Crie uma com os serviços da Origo e mande o link pelo WhatsApp.</p>
               )}
             </Card>
+            {contratos.length > 0 && (
+              <Card flush title="Contrato">
+                <ul className="divide-y divide-line">
+                  {contratos.map((ct) => (
+                    <li key={ct.id}>
+                      <Link href={`/contratos/${ct.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2/60">
+                        <FileSignature size={18} className="text-brand" />
+                        <span className="flex-1 text-[13.5px] font-semibold">Contrato Nº {numeroContrato(ct.numero)}</span>
+                        <Badge tone={STATUS_CONTRATO[ct.status].tone}>{STATUS_CONTRATO[ct.status].label}</Badge>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
             {lead.status !== 'fechou' && lead.status !== 'perdido' && (
               <Card title="Cadência de mensagens" aside="4 toques em 10 dias">
                 <Cadence key={k} lead={lead} />

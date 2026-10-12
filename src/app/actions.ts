@@ -1,14 +1,18 @@
 'use server';
 
-import { cookies } from 'next/headers';
+import { createHash } from 'node:crypto';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { checkPassword, createSessionToken, isLoginConfigured, requireAuth, SESSION_COOKIE, SESSION_MAX_AGE } from '@/lib/auth';
-import { db, type Charge, type Client, type ItemProposta, type LeadStatus, type Prioridade, type Proposal, type Service, type TaskStatus, type TaskTemplate } from '@/lib/db';
+import { db, type Charge, type Client, type Contract, type Contratante, type ItemProposta, type LeadStatus, type Prioridade, type Proposal, type Service, type TaskStatus, type TaskTemplate } from '@/lib/db';
 import { addDays, monthRange, today } from '@/lib/dates';
 import { ESPERA, NICHO, normalizeWhatsapp, type Passo } from '@/lib/prospeccao';
 import { CONDICOES_PADRAO, INTRODUCAO_PADRAO, itemDoServico, plataformaDosItens, totais } from '@/lib/propostas';
 import { criarOnboarding } from '@/lib/modelos';
+import { criarContrato, lerEmpresa } from '@/lib/contratos';
+import { clausulas } from '@/lib/contrato';
+import { chavesPush, enviarParaTodos, resumoDoDia } from '@/lib/push';
 import { AsaasErro, buscarCobranca, camposDoPagamento, emitirCobranca, garantirCliente, removerCobranca } from '@/lib/asaas';
 
 export async function login(_: unknown, form: FormData) {
@@ -162,9 +166,14 @@ export async function convertLead(id: string) {
   const itens = proposta?.itens ?? [];
   const t = totais(itens, proposta?.desconto);
   const hoje = today();
+  const { data: ct } = await supa.from('contracts').select('*').eq('lead_id', id).neq('status', 'cancelado').order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const k = ((ct as Contract | null)?.contratante ?? {}) as Contratante;
   const { data: cliente } = await supa
     .from('clients')
     .insert({
+      documento: k.documento || null,
+      endereco: k.endereco || null,
+      email: k.email || null,
       nome: lead.nome,
       cidade: lead.cidade,
       segmento: NICHO[lead.nicho as keyof typeof NICHO],
@@ -172,7 +181,7 @@ export async function convertLead(id: string) {
       mensalidade: proposta ? t.mensalFinal || null : lead.valor,
       servicos: itens,
       dia_vencimento: Math.min(28, Number(addDays(hoje, 3).slice(8, 10))),
-      responsavel: lead.contato,
+      responsavel: k.representante || lead.contato,
       telefone: lead.whatsapp,
       inicio: hoje,
     })
@@ -182,6 +191,7 @@ export async function convertLead(id: string) {
   await Promise.all([
     supa.from('leads').update({ status: 'fechou', client_id: cliente.id, updated_at: agora() }).eq('id', id),
     proposta ? supa.from('proposals').update({ client_id: cliente.id }).eq('id', proposta.id) : null,
+    ct ? supa.from('contracts').update({ client_id: cliente.id }).eq('id', ct.id) : null,
     // Primeira mensalidade já sai com vencimento em 3 dias; as próximas vêm do "Gerar mensalidades".
     supa.from('charges').insert([
       ...(cliente.mensalidade
@@ -270,6 +280,7 @@ export async function setPropostaStatus(id: string, status: Proposal['status']) 
     .select('lead_id')
     .single();
   if (status === 'aceita' && data?.lead_id) await supa.from('leads').update({ status: 'fechou', updated_at: agora() }).eq('id', data.lead_id);
+  if (status === 'aceita') await criarContrato(supa, id);
   refresh();
 }
 
@@ -288,6 +299,7 @@ export async function aceitarProposta(token: string) {
   if (!data || data.status === 'aceita' || data.status === 'recusada') return;
   await supa.from('proposals').update({ status: 'aceita', aceita_em: agora(), updated_at: agora() }).eq('id', data.id);
   if (data.lead_id) await supa.from('leads').update({ status: 'fechou', proxima_acao: today(), updated_at: agora() }).eq('id', data.lead_id);
+  await criarContrato(supa, data.id);
   revalidatePath(`/p/${token}`);
   refresh();
 }
@@ -306,6 +318,7 @@ function dadosCliente(form: FormData) {
     email: texto(form, 'email'),
     telefone: texto(form, 'telefone'),
     documento: texto(form, 'documento'),
+    endereco: texto(form, 'endereco'),
     inicio: texto(form, 'inicio'),
     observacoes: texto(form, 'observacoes'),
   };
@@ -573,4 +586,209 @@ export async function salvarMetas(form: FormData) {
       updated_at: agora(),
     });
   refresh();
+}
+
+// Captura rápida
+
+export async function capturarTarefa(campos: { titulo: string; data: string | null; client_id: string | null; prioridade: Prioridade }) {
+  await requireAuth();
+  if (!campos.titulo.trim()) return;
+  await db().from('tasks').insert({ ...campos, titulo: campos.titulo.trim().slice(0, 300), status: 'todo' });
+  refresh();
+}
+
+export async function capturarLead(campos: { nome: string; whatsapp: string; notas: string | null }) {
+  await requireAuth();
+  const nome = campos.nome.trim();
+  if (!nome) return;
+  const whatsapp = normalizeWhatsapp(campos.whatsapp);
+  const { data: last } = await db().from('leads').select('ordem').order('ordem', { ascending: false }).limit(1);
+  await db()
+    .from('leads')
+    .insert({ nome, nicho: 'outro', whatsapp, whatsapp_confirmado: !!whatsapp, notas: campos.notas, ordem: (last?.[0]?.ordem ?? 0) + 1 });
+  refresh();
+}
+
+// Contratos
+
+export async function gerarContrato(proposalId: string) {
+  await requireAuth();
+  const id = await criarContrato(db(), proposalId);
+  refresh();
+  if (id) redirect(`/contratos/${id}`);
+}
+
+function contratanteDoForm(form: FormData): Contratante {
+  return {
+    nome: texto(form, 'nome') ?? '',
+    documento: (texto(form, 'documento') ?? '').replace(/[^\d./-]/g, ''),
+    endereco: texto(form, 'endereco') ?? '',
+    email: texto(form, 'email') ?? '',
+    telefone: texto(form, 'telefone') ?? '',
+    representante: texto(form, 'representante') ?? '',
+    representante_cpf: texto(form, 'representante_cpf') ?? '',
+  };
+}
+
+export async function salvarContrato(id: string, form: FormData) {
+  await requireAuth();
+  await db()
+    .from('contracts')
+    .update({
+      contratante: contratanteDoForm(form),
+      dia_vencimento: Math.min(28, Math.max(1, numero(form, 'dia_vencimento') ?? 10)),
+      updated_at: agora(),
+    })
+    .eq('id', id)
+    .eq('status', 'aguardando');
+  refresh();
+}
+
+export async function cancelarContrato(id: string) {
+  await requireAuth();
+  await db().from('contracts').update({ status: 'cancelado', updated_at: agora() }).eq('id', id);
+  refresh();
+}
+
+// O cliente assina pela página pública do contrato. Guarda o texto exato, o código (hash), data, IP e navegador.
+export async function assinarContrato(token: string, _: unknown, form: FormData): Promise<{ erro?: string; valores?: Contratante; tentativa?: number }> {
+  if (!/^[a-f0-9]{32}$/.test(token)) return { erro: 'Link inválido.' };
+  const supa = db();
+  const { data } = await supa.from('contracts').select('*').eq('token', token).maybeSingle();
+  const c = data as Contract | null;
+  if (!c || c.status !== 'aguardando') return { erro: 'Este contrato não está mais aguardando assinatura.' };
+  const k = contratanteDoForm(form);
+  const falha = (erro: string) => ({ erro, valores: k, tentativa: Date.now() });
+  const doc = (k.documento ?? '').replace(/\D/g, '');
+  const cpf = (k.representante_cpf ?? '').replace(/\D/g, '');
+  if (!k.nome || !k.endereco || !k.representante) return falha('Preencha nome, endereço e quem assina.');
+  if (doc.length !== 11 && doc.length !== 14) return falha('Confira o CPF ou CNPJ do contratante.');
+  if (cpf.length !== 11) return falha('Confira o CPF de quem assina.');
+  if (form.get('aceite') !== 'on') return falha('Marque a caixa confirmando que leu e concorda.');
+
+  const empresa = await lerEmpresa(supa);
+  const conteudo = JSON.stringify({ empresa, clausulas: clausulas(empresa, { ...c, contratante: k }) });
+  const hash = createHash('sha256').update(conteudo).digest('hex');
+  const h = await headers();
+  const { error } = await supa
+    .from('contracts')
+    .update({
+      contratante: k,
+      conteudo,
+      hash,
+      status: 'assinado',
+      assinado_em: agora(),
+      assinado_nome: k.representante,
+      assinado_documento: k.representante_cpf,
+      assinado_ip: (h.get('x-forwarded-for') ?? '').split(',')[0].trim() || h.get('x-real-ip') || null,
+      assinado_navegador: (h.get('user-agent') ?? '').slice(0, 300),
+      updated_at: agora(),
+    })
+    .eq('id', c.id)
+    .eq('status', 'aguardando');
+  if (error) return { erro: 'Não consegui registrar a assinatura. Tente de novo.' };
+
+  // Se já é cliente, completa o cadastro com o que ele preencheu (ajuda a emitir no Asaas).
+  const clientId = c.client_id ?? (c.lead_id ? (await supa.from('leads').select('client_id').eq('id', c.lead_id).single()).data?.client_id : null);
+  if (clientId) {
+    const { data: cli } = await supa.from('clients').select('documento, endereco, email, responsavel').eq('id', clientId).single();
+    if (cli) {
+      await supa
+        .from('clients')
+        .update({
+          documento: cli.documento || k.documento || null,
+          endereco: cli.endereco || k.endereco || null,
+          email: cli.email || k.email || null,
+          responsavel: cli.responsavel || k.representante || null,
+        })
+        .eq('id', clientId);
+    }
+  }
+  revalidatePath(`/c/${token}`);
+  refresh();
+  return {};
+}
+
+export async function salvarEmpresa(form: FormData) {
+  await requireAuth();
+  await db()
+    .from('settings')
+    .upsert({
+      chave: 'empresa',
+      valor: {
+        nome: texto(form, 'nome') ?? 'Origo Company',
+        responsavel: texto(form, 'responsavel') ?? 'Renato Farias',
+        documento: texto(form, 'documento') ?? '',
+        endereco: texto(form, 'endereco') ?? '',
+        cidade: texto(form, 'cidade') ?? 'Igarassu-PE',
+        email: texto(form, 'email') ?? '',
+      },
+      updated_at: agora(),
+    });
+  refresh();
+}
+
+// Relatórios mensais
+
+export async function novoRelatorio(clientId: string, form: FormData) {
+  await requireAuth();
+  const competencia = texto(form, 'competencia') ?? today().slice(0, 7);
+  const supa = db();
+  const { data: existe } = await supa.from('reports').select('id').eq('client_id', clientId).eq('competencia', competencia).maybeSingle();
+  if (existe) redirect(`/relatorios/${existe.id}`);
+  // Começa com o mesmo nome de conversão do relatório anterior.
+  const { data: anterior } = await supa.from('reports').select('conversao_nome').eq('client_id', clientId).order('competencia', { ascending: false }).limit(1).maybeSingle();
+  const { data } = await supa
+    .from('reports')
+    .insert({ client_id: clientId, competencia, conversao_nome: anterior?.conversao_nome ?? 'Contatos' })
+    .select('id')
+    .single();
+  refresh();
+  if (data) redirect(`/relatorios/${data.id}`);
+}
+
+export async function salvarRelatorio(
+  id: string,
+  campos: { investimento: number | null; impressoes: number | null; cliques: number | null; conversoes: number | null; conversao_nome: string; destaques: string | null; proximos_passos: string | null },
+) {
+  await requireAuth();
+  await db().from('reports').update({ ...campos, updated_at: agora() }).eq('id', id);
+  refresh();
+}
+
+export async function marcarRelatorioEnviado(id: string) {
+  await requireAuth();
+  await db().from('reports').update({ status: 'enviado', updated_at: agora() }).eq('id', id);
+  refresh();
+}
+
+export async function excluirRelatorio(id: string, clientId: string) {
+  await requireAuth();
+  await db().from('reports').delete().eq('id', id);
+  refresh();
+  redirect(`/clientes/${clientId}?tab=relatorios`);
+}
+
+// Lembrete no celular
+
+export async function chavePublicaPush() {
+  await requireAuth();
+  return (await chavesPush(db())).publicKey;
+}
+
+export async function salvarInscricao(sub: { endpoint: string; keys: { p256dh: string; auth: string } }) {
+  await requireAuth();
+  if (!sub?.endpoint?.startsWith('https://') || !sub.keys?.p256dh || !sub.keys?.auth) return;
+  await db().from('push_subscriptions').upsert({ endpoint: sub.endpoint, keys: sub.keys }, { onConflict: 'endpoint' });
+}
+
+export async function removerInscricao(endpoint: string) {
+  await requireAuth();
+  await db().from('push_subscriptions').delete().eq('endpoint', endpoint);
+}
+
+export async function enviarLembreteTeste() {
+  await requireAuth();
+  const supa = db();
+  return enviarParaTodos(supa, await resumoDoDia(supa));
 }
