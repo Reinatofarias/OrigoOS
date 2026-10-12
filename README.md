@@ -15,7 +15,7 @@ Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
 1. **Banco:** no Supabase, abra *SQL Editor*, cole o conteúdo de `supabase/instalar.sql` e rode. Isso cria as tabelas e cadastra os 5 clientes e os 25 leads iniciais.
 2. **Vercel:** importe este repositório e cadastre as variáveis de `.env.example`:
    - `SUPABASE_URL`: em Supabase > Settings > API (Project URL)
-   - `SUPABASE_SERVICE_ROLE_KEY`: em Supabase > Settings > API Keys (service_role / secret). Nunca coloque no código.
+   - `SUPABASE_SECRET_KEY`: uma Secret key (sb_secret_...) em Supabase > Settings > API Keys. Nunca coloque no código. Se ela não existir, o app usa `SUPABASE_SERVICE_ROLE_KEY` (a que a integração Supabase + Vercel sincroniza).
    - `ORIGO_PASSWORD`: a senha que você vai usar para entrar.
    - `ORIGO_SESSION_SECRET`: um texto longo e aleatório.
 3. Faça o deploy e entre com a senha.
