@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Save, Trash2 } from 'lucide-react';
+import { DownloadCloud, Save, Trash2 } from 'lucide-react';
 import { excluirRelatorio, marcarRelatorioEnviado, salvarRelatorio } from '@/app/actions';
+import { puxarNumeros } from '@/app/acoes/clientes';
 import type { Report } from '@/lib/db';
 import type { Numeros } from '@/lib/relatorio';
 import { Field } from './dialog';
@@ -43,6 +44,16 @@ export default function RelatorioEditor({ r, anterior, cliente, telefone, link }
     destaques: f.destaques.trim() || null,
     proximos_passos: f.proximos_passos.trim() || null,
   });
+  const [aviso, setAviso] = useState('');
+  const puxar = () =>
+    start(async () => {
+      const res = await puxarNumeros(r.id);
+      if (!res.numeros) return setAviso(res.erro ?? 'Não consegui puxar.');
+      const n = res.numeros;
+      setF((x) => ({ ...x, investimento: str(n.investimento), impressoes: str(n.impressoes), cliques: str(n.cliques), conversoes: str(n.conversoes) }));
+      setSujo(true);
+      setAviso(`Números do ${res.plataformas.map((p) => (p === 'google' ? 'Google' : 'Meta')).join(' + ')} no mês. Confira e salve.`);
+    });
   const nomeCurto = cliente.replace(/^(Dra?\.|Delegada)\s+/i, '').split(' ')[0];
 
   return (
@@ -66,8 +77,13 @@ export default function RelatorioEditor({ r, anterior, cliente, telefone, link }
           />
         </section>
         <section className="grid gap-3 rounded-xl border border-line bg-surface p-4">
-          <h2 className="text-[14px] font-semibold">Números do mês</h2>
-          <p className="-mt-2 text-[12px] text-muted">Copie do Google Ads ou do Gerenciador de Anúncios da Meta (soma das campanhas do mês).</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[14px] font-semibold">Números do mês</h2>
+            <button type="button" onClick={puxar} disabled={pending} className={btn.ghost}>
+              <DownloadCloud size={14} /> Puxar do Meta/Google
+            </button>
+          </div>
+          <p className="-mt-2 text-[12px] text-muted">{aviso || 'Com as contas ligadas, os números vêm sozinhos. Senão, copie do Google Ads ou do Gerenciador de Anúncios.'}</p>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Investimento (R$)">
               <input inputMode="decimal" value={f.investimento} onChange={set('investimento')} className="field" />

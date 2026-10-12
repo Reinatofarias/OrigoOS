@@ -5,7 +5,7 @@ import { Check, Copy, Download, ExternalLink, MessageCircle } from 'lucide-react
 import { btn } from './ui';
 
 // Botões pra mandar um link público (contrato, relatório) pro cliente.
-export function LinkAcoes({ link, whatsapp, mensagem, aoEnviar }: { link: string; whatsapp?: string | null; mensagem: string; aoEnviar?: () => void }) {
+export function LinkAcoes({ link, whatsapp, mensagem, aoEnviar, semPdf }: { link: string; whatsapp?: string | null; mensagem: string; aoEnviar?: () => void; semPdf?: boolean }) {
   const [copiado, setCopiado] = useState(false);
   async function copiar() {
     try {
@@ -36,9 +36,11 @@ export function LinkAcoes({ link, whatsapp, mensagem, aoEnviar }: { link: string
         <a href={link} target="_blank" rel="noopener noreferrer" className={btn.ghost}>
           <ExternalLink size={14} /> Ver como o cliente vê
         </a>
-        <a href={`${link}?pdf=1`} target="_blank" rel="noopener noreferrer" className={btn.ghost}>
-          <Download size={14} /> Baixar PDF
-        </a>
+        {!semPdf && (
+          <a href={`${link}?pdf=1`} target="_blank" rel="noopener noreferrer" className={btn.ghost}>
+            <Download size={14} /> Baixar PDF
+          </a>
+        )}
       </div>
     </div>
   );

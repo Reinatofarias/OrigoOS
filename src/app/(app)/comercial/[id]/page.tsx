@@ -8,15 +8,17 @@ import { novaProposta } from '@/app/actions';
 import { today, prazo } from '@/lib/dates';
 import { brl } from '@/lib/format';
 import { NICHO, formatWhatsapp } from '@/lib/prospeccao';
+import { lerModelos } from '@/lib/mensagens';
 import { Avatar, Badge, Body, Card, PageHeader, btn } from '@/components/ui';
 import { Cadence, DealActions, DealField, DealNotes, StageBar } from '@/components/deal';
 
 export default async function NegocioPage({ params }: PageProps<'/comercial/[id]'>) {
   const { id } = await params;
-  const [{ data }, { data: props }, { data: cts }] = await Promise.all([
+  const [{ data }, { data: props }, { data: cts }, modelos] = await Promise.all([
     db().from('leads').select('*').eq('id', id).maybeSingle(),
     db().from('proposals').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     db().from('contracts').select('*').eq('lead_id', id).neq('status', 'cancelado').order('created_at', { ascending: false }),
+    lerModelos(db()),
   ]);
   const contratos = (cts ?? []) as Contract[];
   if (!data) notFound();
@@ -170,7 +172,7 @@ export default async function NegocioPage({ params }: PageProps<'/comercial/[id]
             )}
             {lead.status !== 'fechou' && lead.status !== 'perdido' && (
               <Card title="Cadência de mensagens" aside="4 toques em 10 dias">
-                <Cadence key={k} lead={lead} />
+                <Cadence key={k} lead={lead} modelos={modelos} />
               </Card>
             )}
             <Card title="Anotações">

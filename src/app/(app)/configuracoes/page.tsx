@@ -9,9 +9,19 @@ import { PRIORIDADE } from '@/components/tasks';
 import { addService, addTemplate, salvarEmpresa } from '@/app/actions';
 import { lerEmpresa } from '@/lib/contratos';
 import Lembrete from '@/components/lembrete';
+import Autenticador from '@/components/autenticador';
+import { lerModelos } from '@/lib/mensagens';
+import { CHAVES_MENSAGEM, MODELOS_PADRAO, PASSOS } from '@/lib/prospeccao';
+import { lerSeguranca, nomeDoAparelho } from '@/lib/seguranca';
+import { metaConfigurado, tokenGoogle } from '@/lib/anuncios';
+import { scriptGoogle } from '@/lib/script-google';
+import { cronProtegido } from '@/lib/cron';
+import { restaurarMensagens, salvarMensagens } from '@/app/acoes/prospeccao';
+import { sairDeTodos } from '@/app/acoes/seguranca';
+import { SairDeTodos } from '@/components/sair-todos';
 import { btn } from '@/components/ui';
 
-const TABS = ['servicos', 'onboarding', 'rotina', 'empresa', 'app', 'asaas'] as const;
+const TABS = ['servicos', 'onboarding', 'rotina', 'empresa', 'mensagens', 'integracoes', 'app', 'asaas', 'seguranca'] as const;
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 function Cabecalho({ cols, nomes }: { cols: string; nomes: string[] }) {
@@ -81,6 +91,17 @@ function CamposModelo({ tipo }: { tipo: TaskTemplate['tipo'] }) {
   );
 }
 
+const EVENTOS: Record<string, { label: string; ruim?: boolean }> = {
+  login: { label: 'Entrou' },
+  login_falhou: { label: 'Senha ou código errado', ruim: true },
+  login_travado: { label: 'Login travado (muitas tentativas)', ruim: true },
+  sair_todos: { label: 'Saiu de todos os aparelhos' },
+  autenticador_ligado: { label: 'Ligou a verificação em duas etapas' },
+  autenticador_desligado: { label: 'Desligou a verificação em duas etapas', ruim: true },
+  backup_baixado: { label: 'Baixou o backup' },
+  formulario: { label: 'Contato pelo formulário do site' },
+};
+
 function Item({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
@@ -106,6 +127,15 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
   const webhook = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}/api/asaas`;
   const ambiente = asaasAmbiente();
   const empresa = await lerEmpresa(supa);
+  const origem = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}`;
+  const ler = async (chave: string) => (await supa.from('settings').select('valor').eq('chave', chave).maybeSingle()).data?.valor ?? null;
+  const textos = tab === 'mensagens' ? await lerModelos(supa) : {};
+  const seg = tab === 'seguranca' ? await lerSeguranca(supa) : null;
+  const acessos = tab === 'seguranca' ? ((await supa.from('access_log').select('*').order('created_at', { ascending: false }).limit(25)).data ?? []) : [];
+  const backup = tab === 'seguranca' ? ((await ler('backup_ultimo')) as { em: string; arquivo: string } | null) : null;
+  const google = tab === 'integracoes' ? { token: await tokenGoogle(supa), ultimo: (await ler('google_ultimo')) as { em: string; dias: number; sem_cliente: string[] } | null } : null;
+  const noturno = tab === 'integracoes' ? ((await ler('noturno_ultimo')) as { em: string; meta?: { dias: number; erros: string[] } } | null) : null;
+  const quando = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
   return (
     <>
@@ -118,8 +148,11 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
             { key: 'onboarding', label: 'Onboarding', href: '/configuracoes?tab=onboarding', count: onboarding.length },
             { key: 'rotina', label: 'Tarefas recorrentes', href: '/configuracoes?tab=rotina', count: rotina.length },
             { key: 'empresa', label: 'Dados da Origo', href: '/configuracoes?tab=empresa' },
+            { key: 'mensagens', label: 'Mensagens e site', href: '/configuracoes?tab=mensagens' },
+            { key: 'integracoes', label: 'Meta e Google', href: '/configuracoes?tab=integracoes' },
             { key: 'app', label: 'App e lembrete', href: '/configuracoes?tab=app' },
             { key: 'asaas', label: 'Asaas', href: '/configuracoes?tab=asaas' },
+            { key: 'seguranca', label: 'Segurança', href: '/configuracoes?tab=seguranca' },
           ]}
         />
       </div>
@@ -278,6 +311,143 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                 </li>
                 <li>Faça um novo deploy na Vercel pra as variáveis valerem.</li>
               </ol>
+            </Card>
+          </div>
+        )}
+
+        {tab === 'mensagens' && (
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <Card title="Mensagens da prospecção">
+              <form action={salvarMensagens} className="grid gap-4">
+                {PASSOS.map((p) => (
+                  <Field key={p.passo} label={`${p.titulo} · ${p.quando}`}>
+                    <textarea name={p.passo} rows={4} defaultValue={textos[p.passo] ?? MODELOS_PADRAO[p.passo]} className="field resize-y text-[13px] leading-relaxed" />
+                  </Field>
+                ))}
+                <div className="flex flex-wrap gap-2">
+                  <button className={btn.primary}>Salvar mensagens</button>
+                  <button formAction={restaurarMensagens} className={btn.ghost}>
+                    Voltar pras mensagens padrão
+                  </button>
+                </div>
+              </form>
+            </Card>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+              <Card title="O que dá pra usar no texto">
+                <ul className="grid gap-1.5 text-[13px]">
+                  {CHAVES_MENSAGEM.map((c) => (
+                    <li key={c.chave}>
+                      <code className="rounded bg-surface-2 px-1">{c.chave}</code> <span className="text-muted">{c.o_que}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-[12.5px] text-muted">No Início, o botão &quot;Mandar M1&quot; abre o WhatsApp com a mensagem pronta e já marca como enviada.</p>
+              </Card>
+              <Card title="Formulário pro seu site">
+                <p className="text-[13px] text-muted">Quem preencher vira lead em &quot;Respondeu&quot; e você recebe um aviso no celular na hora.</p>
+                <code className="mt-3 block break-all rounded-lg bg-surface-2 px-2.5 py-2 text-[12.5px]">{origem}/f</code>
+                <p className="mt-3 text-[12.5px] text-muted">Pra colocar dentro de uma página do site, use este código:</p>
+                <code className="mt-1.5 block break-all rounded-lg bg-surface-2 px-2.5 py-2 text-[12px]">{`<iframe src="${origem}/f?embed=1" style="width:100%;max-width:480px;height:720px;border:0" title="Fale com a Origo"></iframe>`}</code>
+                <a href="/f" target="_blank" className={`${btn.ghost} mt-3`}>
+                  Ver o formulário
+                </a>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {tab === 'integracoes' && google && (
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
+            <Card title="Meta Ads">
+              <ul className="grid gap-2 text-[13.5px]">
+                <Item ok={metaConfigurado()}>Token de acesso {metaConfigurado() ? 'configurado' : 'não configurado'}</Item>
+                <Item ok={!!noturno?.meta && !noturno.meta.erros?.length}>
+                  {noturno?.meta ? `Última busca: ${quando(noturno.em)}, ${noturno.meta.dias} dia(s) de números` : 'Nenhuma busca ainda'}
+                </Item>
+              </ul>
+              {noturno?.meta?.erros?.length ? <p className="mt-2 rounded-lg bg-danger-soft px-3 py-2 text-[12.5px] text-danger">{noturno.meta.erros.join(' · ')}</p> : null}
+              <ol className="mt-4 grid list-decimal gap-2 pl-5 text-[13px] leading-relaxed">
+                <li>
+                  Em <strong>business.facebook.com &gt; Configurações &gt; Usuários do sistema</strong>, crie um usuário do sistema (Administrador).
+                </li>
+                <li>Em &quot;Atribuir ativos&quot;, dê acesso às contas de anúncio dos clientes.</li>
+                <li>
+                  Clique em <strong>Gerar token</strong>, marque a permissão <code className="rounded bg-surface-2 px-1">ads_read</code> e escolha &quot;Nunca expira&quot;.
+                </li>
+                <li>
+                  Na Vercel, crie a variável <code className="rounded bg-surface-2 px-1">META_ACCESS_TOKEN</code> com esse token e faça um novo deploy.
+                </li>
+                <li>No cliente, aba Anúncios, coloque o ID da conta de anúncio (o número depois de &quot;act_&quot;).</li>
+              </ol>
+              <p className="mt-3 text-[12.5px] text-muted">O sistema busca os números toda madrugada. O token fica só na Vercel; nunca mande ele pelo chat.</p>
+            </Card>
+            <Card title="Google Ads">
+              <ul className="grid gap-2 text-[13.5px]">
+                <Item ok={!!google.ultimo}>{google.ultimo ? `Último envio do script: ${quando(google.ultimo.em)}, ${google.ultimo.dias} dia(s)` : 'O script ainda não mandou nada'}</Item>
+              </ul>
+              {google.ultimo?.sem_cliente?.length ? (
+                <p className="mt-2 rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] text-warn">Contas sem cliente ligado: {google.ultimo.sem_cliente.join(', ')}. Coloque o ID na aba Anúncios do cliente.</p>
+              ) : null}
+              <ol className="mt-4 grid list-decimal gap-2 pl-5 text-[13px] leading-relaxed">
+                <li>
+                  No Google Ads (de preferência na sua conta de administrador), vá em <strong>Ferramentas &gt; Ações em massa &gt; Scripts</strong> e crie um script novo.
+                </li>
+                <li>Apague o que vier escrito e cole o script abaixo.</li>
+                <li>Clique em Autorizar, depois em Executar uma vez pra testar.</li>
+                <li>
+                  Em Frequência, escolha <strong>Diariamente</strong> (de madrugada).
+                </li>
+              </ol>
+              <textarea readOnly rows={10} value={scriptGoogle(`${origem}/api/metricas`, google.token)} className="field mt-3 font-mono text-[11.5px]" aria-label="Script do Google Ads" />
+              <p className="mt-2 text-[12px] text-muted">O script tem uma senha própria pra só ele conseguir mandar números. Não publique ele.</p>
+            </Card>
+          </div>
+        )}
+
+        {tab === 'seguranca' && seg && (
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+              <Card title="Verificação em duas etapas">
+                <Autenticador ativo={seg.totp_ativo} />
+              </Card>
+              <Card title="Situação">
+                <ul className="grid gap-2 text-[13.5px]">
+                  <Item ok>Login trava 15 minutos depois de 5 senhas erradas</Item>
+                  <Item ok={seg.totp_ativo}>Verificação em duas etapas {seg.totp_ativo ? 'ligada' : 'desligada'}</Item>
+                  <Item ok={(process.env.ORIGO_PASSWORD?.trim().length ?? 0) >= 12}>
+                    Senha {(process.env.ORIGO_PASSWORD?.trim().length ?? 0) >= 12 ? 'com 12 caracteres ou mais' : 'curta: troque ORIGO_PASSWORD na Vercel por uma com 12 caracteres ou mais'}
+                  </Item>
+                  <Item ok={(process.env.ORIGO_SESSION_SECRET?.trim().length ?? 0) >= 32}>Segredo da sessão {(process.env.ORIGO_SESSION_SECRET?.trim().length ?? 0) >= 32 ? 'forte' : 'curto (use 32 caracteres ou mais)'}</Item>
+                  <Item ok={cronProtegido()}>
+                    Tarefas automáticas {cronProtegido() ? 'protegidas por CRON_SECRET' : <>sem senha própria: crie <code className="rounded bg-surface-2 px-1">CRON_SECRET</code> na Vercel</>}
+                  </Item>
+                  <Item ok={!!backup}>{backup ? `Último backup automático: ${quando(backup.em)}` : 'Backup automático ainda não rodou (roda todo domingo de madrugada)'}</Item>
+                </ul>
+              </Card>
+              <Card title="Backup">
+                <p className="text-[13px] text-muted">Baixa um arquivo com tudo do sistema (clientes, leads, tarefas, cobranças, contratos, relatórios). Guarde no seu Google Drive. Toda semana o sistema também guarda uma cópia sozinho no Supabase (as 8 últimas).</p>
+                <a href="/api/backup" className={`${btn.secondary} mt-3`}>
+                  Baixar backup agora
+                </a>
+              </Card>
+            </div>
+            <Card
+              flush
+              title="Acessos recentes"
+              aside={<SairDeTodos action={sairDeTodos} />}
+            >
+              <ul className="divide-y divide-line">
+                {acessos.map((a) => (
+                  <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2.5 text-[13px]">
+                    <span className={`font-semibold ${EVENTOS[a.evento]?.ruim ? 'text-danger' : ''}`}>{EVENTOS[a.evento]?.label ?? a.evento}</span>
+                    <span className="text-muted">{a.navegador ? nomeDoAparelho(a.navegador) : ''}</span>
+                    <span className="ml-auto text-[12px] tabular-nums text-muted">
+                      {quando(a.created_at)} · {a.ip ?? '—'}
+                    </span>
+                  </li>
+                ))}
+                {!acessos.length && <li className="px-4 py-6 text-center text-[13px] text-muted">Nenhum acesso registrado ainda.</li>}
+              </ul>
             </Card>
           </div>
         )}

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { AtSign, Check, Copy, MessageCircle, Send } from 'lucide-react';
 import { convertLead, markSent, setLeadStatus, updateLead } from '@/app/actions';
 import type { Lead, LeadStatus } from '@/lib/db';
-import { ETAPAS, PASSOS, etapaDe, mensagem, proximoPasso, type Passo } from '@/lib/prospeccao';
+import { ETAPAS, PASSOS, etapaDe, mensagem, proximoPasso, type Modelos, type Passo } from '@/lib/prospeccao';
 import { btn } from './ui';
 
 export function StageBar({ lead }: { lead: Lead }) {
@@ -126,16 +126,16 @@ export function DealNotes({ lead }: { lead: Lead }) {
 }
 
 // Mensagens M1 a M4 prontas, com envio pelo WhatsApp.
-export function Cadence({ lead }: { lead: Lead }) {
+export function Cadence({ lead, modelos }: { lead: Lead; modelos?: Partial<Modelos> }) {
   const sugerido = proximoPasso(lead.status) ?? 'm1';
   const [passo, setPasso] = useState<Passo>(sugerido);
-  const [texto, setTexto] = useState(() => mensagem(sugerido, lead));
+  const [texto, setTexto] = useState(() => mensagem(sugerido, lead, modelos));
   const [copiado, setCopiado] = useState(false);
   const [pending, start] = useTransition();
 
   function escolher(p: Passo) {
     setPasso(p);
-    setTexto(mensagem(p, lead));
+    setTexto(mensagem(p, lead, modelos));
   }
 
   async function copiar() {
@@ -181,8 +181,8 @@ export function Cadence({ lead }: { lead: Lead }) {
       )}
       <div className="flex flex-wrap gap-2">
         {waHref && (
-          <a href={waHref} target="_blank" rel="noopener noreferrer" className={btn.wa}>
-            <MessageCircle size={15} /> Abrir no WhatsApp
+          <a href={waHref} target="_blank" rel="noopener noreferrer" onClick={() => start(() => markSent(lead.id, passo))} className={btn.wa}>
+            <MessageCircle size={15} /> Mandar {passo.toUpperCase()} no WhatsApp
           </a>
         )}
         {lead.instagram && (
@@ -194,7 +194,7 @@ export function Cadence({ lead }: { lead: Lead }) {
           {copiado ? <Check size={15} /> : <Copy size={15} />} {copiado ? 'Copiada' : 'Copiar'}
         </button>
         <button type="button" onClick={() => start(() => markSent(lead.id, passo))} className={btn.primary}>
-          <Send size={15} /> Marcar {passo.toUpperCase()} como enviada
+          <Send size={15} /> Só marcar como enviada
         </button>
       </div>
     </div>

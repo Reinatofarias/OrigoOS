@@ -2,17 +2,11 @@ import { db } from '@/lib/db';
 import { today, weekday } from '@/lib/dates';
 import { garantirRecorrentes } from '@/lib/modelos';
 import { enviarParaTodos, resumoDoDia } from '@/lib/push';
+import { cronAutorizado } from '@/lib/cron';
 
 // Chamado pela Vercel Cron às 7h51 (horário de Recife), de segunda a sexta. Ver vercel.json.
-// Com CRON_SECRET na Vercel, só aceita o pedido da própria Vercel; sem ele, aceita o robô do Cron.
-function autorizado(request: Request) {
-  const segredo = process.env.CRON_SECRET?.trim();
-  if (segredo) return request.headers.get('authorization') === `Bearer ${segredo}`;
-  return (request.headers.get('user-agent') ?? '').includes('vercel-cron');
-}
-
 export async function GET(request: Request) {
-  if (!autorizado(request)) return Response.json({ erro: 'não autorizado' }, { status: 401 });
+  if (!cronAutorizado(request)) return Response.json({ erro: 'não autorizado' }, { status: 401 });
   const hoje = today();
   if (weekday(hoje) === 0 || weekday(hoje) === 6) return Response.json({ ok: true, pulado: 'fim de semana' });
 

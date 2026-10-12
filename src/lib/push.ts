@@ -3,6 +3,7 @@ import webpush from 'web-push';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { addDays, today } from './dates';
 import type { Task } from './db';
+import { saudeDosClientes } from './saude';
 
 // Lembrete no celular (Web Push). As chaves VAPID são geradas na primeira vez e ficam guardadas no banco,
 // então não precisa configurar nada na Vercel.
@@ -60,6 +61,8 @@ export async function resumoDoDia(supa: SupabaseClient): Promise<Aviso> {
   const vencidas = (ch ?? []).filter((c) => c.vencimento < hoje).length;
   if (vencidas) extra.push(`${vencidas} cobrança${vencidas > 1 ? 's' : ''} vencida${vencidas > 1 ? 's' : ''}`);
   else if (ch?.length) extra.push(`${ch.length} cobrança${ch.length > 1 ? 's' : ''} vencendo`);
+  const risco = (await saudeDosClientes(supa, hoje)).filter((c) => c.nivel === 'risco');
+  if (risco.length) extra.push(`${risco.length} cliente${risco.length > 1 ? 's' : ''} em risco: ${risco.map((c) => c.nome).join(', ')}`);
   const corpo = [...(tres.length ? tres : ['Nenhuma tarefa marcada pra hoje.']), ...(extra.length ? [extra.join(' · ')] : [])].join('\n');
   return { title: tarefas.length > 3 ? `Bom dia, Renato! ${tarefas.length} tarefas hoje` : 'Bom dia, Renato! Suas 3 coisas de hoje', body: corpo, url: '/' };
 }
