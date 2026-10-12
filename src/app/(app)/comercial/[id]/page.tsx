@@ -1,0 +1,123 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { AtSign, MapPin, MessageCircle, Tag, Building2 } from 'lucide-react';
+import { db, type Lead } from '@/lib/db';
+import { today, prazo } from '@/lib/dates';
+import { brl } from '@/lib/format';
+import { NICHO, formatWhatsapp } from '@/lib/prospeccao';
+import { Avatar, Badge, Body, Card, PageHeader } from '@/components/ui';
+import { Cadence, DealActions, DealField, DealNotes, StageBar } from '@/components/deal';
+
+export default async function NegocioPage({ params }: PageProps<'/comercial/[id]'>) {
+  const { id } = await params;
+  const { data } = await db().from('leads').select('*').eq('id', id).maybeSingle();
+  if (!data) notFound();
+  const lead = data as Lead;
+  const hoje = today();
+  const k = `${lead.id}-${lead.status}-${lead.updated_at}`;
+
+  return (
+    <>
+      <PageHeader
+        trail={[{ href: '/comercial', label: 'Comercial' }]}
+        title={
+          <span className="flex items-center gap-3">
+            <Avatar nome={lead.nome} size={36} />
+            <span className="min-w-0">
+              {lead.nome}
+              <span className="block text-[13px] font-medium text-muted">
+                {brl(lead.valor)} por mês · {NICHO[lead.nicho]}
+              </span>
+            </span>
+          </span>
+        }
+      >
+        {lead.status === 'perdido' && <Badge tone="danger">Perdido</Badge>}
+        {lead.status === 'fechou' && <Badge tone="success">Ganho</Badge>}
+        {lead.client_id && (
+          <Link href={`/clientes/${lead.client_id}`} className="text-[13px] font-semibold text-brand">
+            Ver cliente
+          </Link>
+        )}
+        <DealActions lead={lead} />
+      </PageHeader>
+
+      <div className="border-b border-line bg-surface px-4 py-3 md:px-8">
+        <StageBar lead={lead} />
+      </div>
+
+      <Body>
+        <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <div className="grid gap-6">
+            <Card title="Detalhes">
+              <div className="grid divide-y divide-line">
+                <DealField key={`v-${k}`} lead={lead} campo="valor" label="Valor mensal" />
+                <DealField key={`c-${k}`} lead={lead} campo="contato" label="Contato" />
+                <DealField key={`ci-${k}`} lead={lead} campo="cidade" label="Cidade" />
+                <DealField key={`p-${k}`} lead={lead} campo="proxima_acao" label="Próxima ação" type="date" />
+              </div>
+              {lead.proxima_acao && (
+                <p className={`mt-2 text-[12px] ${lead.proxima_acao < hoje ? 'font-semibold text-danger' : 'text-muted'}`}>
+                  {lead.proxima_acao < hoje ? 'Atrasado: ' : 'Próximo toque: '}
+                  {prazo(lead.proxima_acao, hoje)}
+                </p>
+              )}
+            </Card>
+            <Card title="Contato">
+              <ul className="grid gap-2.5 text-[13px]">
+                <li className="flex items-center gap-2">
+                  <MessageCircle size={15} className="text-wa" />
+                  {lead.whatsapp ? (
+                    <a href={`https://wa.me/${lead.whatsapp}`} target="_blank" rel="noopener noreferrer" className="hover:text-brand">
+                      {formatWhatsapp(lead.whatsapp)}
+                    </a>
+                  ) : (
+                    <span className="text-muted">Sem WhatsApp</span>
+                  )}
+                  {lead.whatsapp && lead.whatsapp_confirmado && <Badge tone="success">confirmado</Badge>}
+                </li>
+                <li className="flex items-center gap-2">
+                  <AtSign size={15} className="text-magenta" />
+                  {lead.instagram ? (
+                    <a href={`https://www.instagram.com/${lead.instagram}/`} target="_blank" rel="noopener noreferrer" className="hover:text-brand">
+                      @{lead.instagram}
+                    </a>
+                  ) : (
+                    <span className="text-muted">Sem Instagram</span>
+                  )}
+                </li>
+                <li className="flex items-center gap-2">
+                  <MapPin size={15} className="text-muted" />
+                  <span>{[lead.endereco, lead.cidade].filter(Boolean).join(', ') || '—'}</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Tag size={15} className="text-muted" />
+                  <span>{NICHO[lead.nicho]}</span>
+                </li>
+                {lead.client_id && (
+                  <li className="flex items-center gap-2">
+                    <Building2 size={15} className="text-muted" />
+                    <Link href={`/clientes/${lead.client_id}`} className="font-semibold text-brand">
+                      Já é cliente
+                    </Link>
+                  </li>
+                )}
+              </ul>
+            </Card>
+          </div>
+
+          <div className="grid gap-6">
+            {lead.status !== 'fechou' && lead.status !== 'perdido' && (
+              <Card title="Cadência de mensagens" aside="4 toques em 10 dias">
+                <Cadence key={k} lead={lead} />
+              </Card>
+            )}
+            <Card title="Anotações">
+              <DealNotes key={k} lead={lead} />
+            </Card>
+          </div>
+        </div>
+      </Body>
+    </>
+  );
+}

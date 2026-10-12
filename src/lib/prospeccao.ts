@@ -61,9 +61,26 @@ export const COLUNAS: { status: LeadStatus; titulo: string }[] = [
   { status: 'm4', titulo: 'M4 enviada' },
   { status: 'respondeu', titulo: 'Respondeu' },
   { status: 'call', titulo: 'Call marcada' },
-  { status: 'fechou', titulo: 'Fechou' },
-  { status: 'perdido', titulo: 'Sem interesse' },
+  { status: 'proposta', titulo: 'Proposta enviada' },
+  { status: 'fechou', titulo: 'Ganho' },
+  { status: 'perdido', titulo: 'Perdido' },
 ];
+
+// Etapas do funil comercial (colunas do quadro). A cadência M1 a M4 fica toda numa etapa só.
+export type Etapa = { id: string; titulo: string; status: LeadStatus[]; destino: LeadStatus; cor: string };
+
+export const ETAPAS: Etapa[] = [
+  { id: 'novo', titulo: 'Novos leads', status: ['novo'], destino: 'novo', cor: '#9a9cb5' },
+  { id: 'cadencia', titulo: 'Em cadência', status: ['m1', 'm2', 'm3', 'm4'], destino: 'm1', cor: '#1aa7e8' },
+  { id: 'respondeu', titulo: 'Respondeu', status: ['respondeu'], destino: 'respondeu', cor: '#3a6bff' },
+  { id: 'call', titulo: 'Call marcada', status: ['call'], destino: 'call', cor: '#6a4cff' },
+  { id: 'proposta', titulo: 'Proposta', status: ['proposta'], destino: 'proposta', cor: '#a23cff' },
+  { id: 'fechou', titulo: 'Ganho', status: ['fechou'], destino: 'fechou', cor: '#0f9a64' },
+];
+
+export function etapaDe(status: LeadStatus) {
+  return ETAPAS.find((e) => e.status.includes(status));
+}
 
 export function formatWhatsapp(numero: string) {
   const d = numero.slice(2, 4);
