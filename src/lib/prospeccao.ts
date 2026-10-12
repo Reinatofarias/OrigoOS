@@ -30,19 +30,36 @@ export const PASSOS: { passo: Passo; titulo: string; quando: string }[] = [
   { passo: 'm4', titulo: 'M4', quando: '5 dias depois: despedida' },
 ];
 
-export function mensagem(passo: Passo, lead: Pick<Lead, 'nome' | 'cidade' | 'nicho'>) {
-  const trato = lead.nicho === 'adv' ? 'Dr(a)., tudo bem' : 'tudo bem';
-  const busca = `${BUSCA[lead.nicho]} ${lead.cidade ?? ''}`.trim();
-  switch (passo) {
-    case 'm1':
-      return `Oi, ${trato}? Aqui é o Renato, da Origo. Pesquisei "${busca}" no Google agora e vi uma oportunidade clara pra ${lead.nome} aparecer pra quem está procurando esse serviço hoje. ${CASE[lead.nicho]} Posso te mandar um vídeo rápido, de 1 minuto, mostrando o que eu vi?`;
-    case 'm2':
-      return `Gravei esse vídeo pra ${lead.nome}: [cole o link do vídeo]. Em 1 minuto mostro quem aparece quando alguém pesquisa "${busca}" e o que eu faria no lugar de vocês. Faz sentido a gente conversar 20 minutos essa semana?`;
-    case 'm3':
-      return `Só pra você ter uma ideia do que é possível: [resultado real, ex.: "a Invertech recebe X pedidos de orçamento por mês pelo Google"]. Quer que eu te mostre como eu montaria isso pra ${lead.nome}?`;
-    case 'm4':
-      return `Não quero ser chato, então essa é minha última mensagem. Se em algum momento fizer sentido trazer mais clientes pelo Google pra ${lead.nome}, é só me chamar aqui. Sucesso pra vocês!`;
-  }
+export type Modelos = Record<Passo, string>;
+
+// Textos padrão. Em Configurações > Mensagens dá pra mudar; as chaves entre {} viram os dados do lead.
+export const MODELOS_PADRAO: Modelos = {
+  m1: 'Oi, {trato}? Aqui é o Renato, da Origo. Pesquisei "{busca}" no Google agora e vi uma oportunidade clara pra {nome} aparecer pra quem está procurando esse serviço hoje. {case} Posso te mandar um vídeo rápido, de 1 minuto, mostrando o que eu vi?',
+  m2: 'Gravei esse vídeo pra {nome}: [cole o link do vídeo]. Em 1 minuto mostro quem aparece quando alguém pesquisa "{busca}" e o que eu faria no lugar de vocês. Faz sentido a gente conversar 20 minutos essa semana?',
+  m3: 'Só pra você ter uma ideia do que é possível: [resultado real, ex.: "a Invertech recebe X pedidos de orçamento por mês pelo Google"]. Quer que eu te mostre como eu montaria isso pra {nome}?',
+  m4: 'Não quero ser chato, então essa é minha última mensagem. Se em algum momento fizer sentido trazer mais clientes pelo Google pra {nome}, é só me chamar aqui. Sucesso pra vocês!',
+};
+
+export const CHAVES_MENSAGEM: { chave: string; o_que: string }[] = [
+  { chave: '{nome}', o_que: 'nome da empresa' },
+  { chave: '{contato}', o_que: 'nome de quem atende (ou "tudo bem")' },
+  { chave: '{cidade}', o_que: 'cidade' },
+  { chave: '{busca}', o_que: 'o que o cliente dele pesquisa + cidade' },
+  { chave: '{case}', o_que: 'frase do case do mesmo ramo' },
+  { chave: '{trato}', o_que: '"Dr(a)., tudo bem" na advocacia, "tudo bem" no resto' },
+];
+
+export function mensagem(passo: Passo, lead: Pick<Lead, 'nome' | 'cidade' | 'nicho'> & { contato?: string | null }, modelos?: Partial<Modelos> | null) {
+  const valores: Record<string, string> = {
+    nome: lead.nome,
+    contato: lead.contato?.trim().split(/\s+/)[0] || 'tudo bem',
+    cidade: lead.cidade ?? '',
+    busca: `${BUSCA[lead.nicho]} ${lead.cidade ?? ''}`.trim(),
+    case: CASE[lead.nicho],
+    trato: lead.nicho === 'adv' ? 'Dr(a)., tudo bem' : 'tudo bem',
+  };
+  const modelo = modelos?.[passo]?.trim() || MODELOS_PADRAO[passo];
+  return modelo.replace(/\{(\w+)\}/g, (m, k: string) => valores[k] ?? m).replace(/ {2,}/g, ' ');
 }
 
 // Qual mensagem mandar agora, conforme o status.

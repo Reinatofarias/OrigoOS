@@ -75,6 +75,11 @@ export type Client = {
   recorrentes: boolean;
   asaas_customer_id: string | null;
   endereco: string | null;
+  meta_conta: string | null;
+  meta_conversoes: string | null;
+  google_conta: string | null;
+  ultimo_contato: string | null;
+  portal_token: string;
   created_at: string;
 };
 
@@ -264,4 +269,27 @@ export type Report = {
   status: 'rascunho' | 'enviado';
   created_at: string;
   updated_at: string;
+};
+
+export type ClientRequest = {
+  id: string;
+  client_id: string;
+  titulo: string;
+  descricao: string | null;
+  status: 'pendente' | 'enviado' | 'ok';
+  resposta: string | null;
+  respondido_em: string | null;
+  ordem: number;
+  created_at: string;
+};
+
+export type AdMetric = {
+  client_id: string;
+  plataforma: 'google' | 'meta';
+  data: string;
+  investimento: number;
+  impressoes: number;
+  cliques: number;
+  conversoes: number;
+  atualizado_em: string;
 };

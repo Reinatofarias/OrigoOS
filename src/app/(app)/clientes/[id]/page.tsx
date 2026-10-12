@@ -1,7 +1,14 @@
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import Link from 'next/link';
-import { Mail, Phone, FileText, CalendarDays, Rocket, FileSignature, BarChart3, Plus } from 'lucide-react';
-import { db, type Charge, type Client, type Contract, type Report, type Task } from '@/lib/db';
+import { Mail, Phone, FileText, CalendarDays, Rocket, FileSignature, BarChart3, Plus, HeartPulse, ListPlus, RefreshCcw } from 'lucide-react';
+import { db, type AdMetric, type Charge, type Client, type ClientRequest, type Contract, type Report, type Task } from '@/lib/db';
+import { NIVEL, saudeDosClientes } from '@/lib/saude';
+import { CONVERSOES_META_PADRAO, metaConfigurado } from '@/lib/anuncios';
+import { adicionarPedido, adicionarPedidosPadrao, novoLinkPortal, registrarContato, salvarContas } from '@/app/acoes/clientes';
+import Pedidos from '@/components/pedidos';
+import { SincronizarMeta } from '@/components/anuncios';
+import { LinkAcoes } from '@/components/link-acoes';
 import { STATUS_CONTRATO, numeroContrato } from '@/lib/contrato';
 import { metricas } from '@/lib/relatorio';
 import { addDays, addMonths, formatMonth, formatShort, prazo, today } from '@/lib/dates';
@@ -17,7 +24,7 @@ import FormDialog, { Field } from '@/components/dialog';
 import ClientFields from '@/components/client-form';
 import { addCharge, aplicarOnboarding, novoRelatorio, saveClient } from '@/app/actions';
 
-const TABS = ['geral', 'cobrancas', 'tarefas', 'relatorios', 'dados'] as const;
+const TABS = ['geral', 'cobrancas', 'tarefas', 'relatorios', 'anuncios', 'portal', 'dados'] as const;
 
 export default async function ClientePage({ params, searchParams }: PageProps<'/clientes/[id]'>) {
   const { id } = await params;
@@ -26,13 +33,16 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
   const hoje = today();
   const supa = db();
   await garantirRecorrentes(supa);
-  const [{ data: c }, { data: ch }, { data: ts }, { data: todos }, { data: cts }, { data: rps }] = await Promise.all([
+  const [{ data: c }, { data: ch }, { data: ts }, { data: todos }, { data: cts }, { data: rps }, { data: ads }, { data: peds }, saudes] = await Promise.all([
     supa.from('clients').select('*').eq('id', id).maybeSingle(),
     supa.from('charges').select('*').eq('client_id', id).order('vencimento', { ascending: false }),
     supa.from('tasks').select('*').eq('client_id', id).order('data', { nullsFirst: false }).order('created_at'),
     supa.from('clients').select('id, nome').order('nome'),
     supa.from('contracts').select('*').eq('client_id', id).neq('status', 'cancelado').order('created_at', { ascending: false }),
     supa.from('reports').select('*').eq('client_id', id).order('competencia', { ascending: false }),
+    supa.from('ad_metrics').select('*').eq('client_id', id).gte('data', addDays(hoje, -30)).order('data', { ascending: false }),
+    supa.from('client_requests').select('*').eq('client_id', id).order('ordem'),
+    saudeDosClientes(supa, hoje),
   ]);
   if (!c) notFound();
   const cliente = c as Client;
@@ -51,6 +61,30 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
   const mesPassado = addMonths(hoje.slice(0, 7), -1);
   const plataformas = cliente.plataforma === 'google_meta' ? (['google', 'meta'] as const) : [cliente.plataforma];
   const base = `/clientes/${id}`;
+  const saude = saudes.find((x) => x.client_id === id);
+  const metricasAds = (ads ?? []) as AdMetric[];
+  const pedidos = (peds ?? []) as ClientRequest[];
+  const pedidosAbertos = pedidos.filter((p) => p.status !== 'ok').length;
+  const ultimos7 = (plat: 'google' | 'meta') => {
+    const l = metricasAds.filter((a) => a.plataforma === plat && a.data >= addDays(hoje, -7));
+    const gasto = l.reduce((t, a) => t + Number(a.investimento), 0);
+    const conv = l.reduce((t, a) => t + Number(a.conversoes), 0);
+    return { tem: l.length > 0, gasto, conv, cpa: conv ? gasto / conv : null };
+  };
+  const h = await headers();
+  const resumo30 = (['google', 'meta'] as const)
+    .map((plat) => {
+      const l = metricasAds.filter((x) => x.plataforma === plat);
+      return { plat, tem: l.length > 0, gasto: l.reduce((t, x) => t + Number(x.investimento), 0), conv: l.reduce((t, x) => t + Number(x.conversoes), 0) };
+    })
+    .filter((r) => r.tem);
+  const porDia = [...new Set(metricasAds.map((x) => x.data))]
+    .slice(0, 14)
+    .map((data) => {
+      const l = metricasAds.filter((x) => x.data === data);
+      return { data, gasto: l.reduce((t, x) => t + Number(x.investimento), 0), cliques: l.reduce((t, x) => t + x.cliques, 0), conv: l.reduce((t, x) => t + Number(x.conversoes), 0) };
+    });
+  const linkPortal = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}/portal/${cliente.portal_token}`;
 
   return (
     <>
@@ -96,6 +130,8 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
             { key: 'cobrancas', label: 'Cobranças', href: `${base}?tab=cobrancas`, count: cobrancas.length },
             { key: 'tarefas', label: 'Tarefas', href: `${base}?tab=tarefas`, count: abertas.length },
             { key: 'relatorios', label: 'Relatórios', href: `${base}?tab=relatorios`, count: relatorios.length },
+            { key: 'anuncios', label: 'Anúncios', href: `${base}?tab=anuncios` },
+            { key: 'portal', label: 'Portal', href: `${base}?tab=portal`, count: pedidosAbertos },
             { key: 'dados', label: 'Dados cadastrais', href: `${base}?tab=dados` },
           ]}
         />
@@ -124,6 +160,44 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                 </Card>
               </div>
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+                {saude && (
+                  <Card title="Saúde do cliente" aside={<Badge tone={NIVEL[saude.nivel].tone}>{NIVEL[saude.nivel].label}</Badge>}>
+                    {saude.alertas.length ? (
+                      <ul className="grid gap-1.5 text-[13px]">
+                        {saude.alertas.map((a) => (
+                          <li key={a.texto} className="flex gap-2">
+                            <HeartPulse size={14} className={`mt-0.5 shrink-0 ${a.nivel === 'risco' ? 'text-danger' : 'text-warn'}`} />
+                            {a.texto}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-[13px] text-muted">Tudo em dia com esse cliente.</p>
+                    )}
+                    <form action={registrarContato.bind(null, id)} className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                      <span className="flex-1 text-[12.5px] text-muted">Último contato: {cliente.ultimo_contato ? prazo(cliente.ultimo_contato, hoje) : 'nunca registrado'}</span>
+                      <button className={btn.secondary}>Falei com ele hoje</button>
+                    </form>
+                  </Card>
+                )}
+                {(ultimos7('meta').tem || ultimos7('google').tem) && (
+                  <Card title="Anúncios nos últimos 7 dias" aside={<a href={`${base}?tab=anuncios`} className="font-semibold text-brand">Detalhes</a>}>
+                    <ul className="grid gap-2 text-[13px]">
+                      {(['google', 'meta'] as const).filter((p) => ultimos7(p).tem).map((p) => {
+                        const u = ultimos7(p);
+                        return (
+                          <li key={p} className="flex justify-between gap-3">
+                            <span className="font-medium">{p === 'google' ? 'Google Ads' : 'Meta Ads'}</span>
+                            <span className="text-right tabular-nums text-muted">
+                              {brl(u.gasto)} · {Math.round(u.conv)} contato{Math.round(u.conv) === 1 ? '' : 's'}
+                              {u.cpa ? ` · ${brl(u.cpa)} cada` : ''}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Card>
+                )}
                 {onboarding.length > 0 ? (
                   <Card title="Onboarding" aside={`${onbFeitas}/${onboarding.length}`}>
                     <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -262,6 +336,116 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
               <Empty>Nenhum relatório ainda. Escolha o mês e crie o primeiro, com link pro cliente e PDF.</Empty>
             )}
           </Card>
+        )}
+
+        {tab === 'anuncios' && (
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+            <Card title="Contas de anúncio">
+              <form action={salvarContas.bind(null, id)} className="grid gap-3">
+                <Field label="ID da conta do Meta Ads">
+                  <input name="meta_conta" defaultValue={cliente.meta_conta ?? ''} placeholder="Ex.: 123456789012345" inputMode="numeric" className="field" />
+                </Field>
+                <Field label="ID da conta do Google Ads">
+                  <input name="google_conta" defaultValue={cliente.google_conta ?? ''} placeholder="Ex.: 123-456-7890" className="field" />
+                </Field>
+                <details className="text-[12.5px] text-muted">
+                  <summary className="cursor-pointer">O que conta como contato no Meta</summary>
+                  <p className="mt-2">Por padrão: conversas iniciadas (WhatsApp e Direct) e leads. Pra mudar, escreva os tipos separados por vírgula.</p>
+                  <input name="meta_conversoes" defaultValue={cliente.meta_conversoes ?? ''} placeholder={CONVERSOES_META_PADRAO.join(', ')} className="field mt-2 text-[12px]" />
+                </details>
+                <div>
+                  <button className={btn.primary}>Salvar contas</button>
+                </div>
+              </form>
+              <div className="mt-4 grid gap-2 border-t border-line pt-4 text-[12.5px] text-muted">
+                <p>
+                  <strong className="text-ink">Meta:</strong> {metaConfigurado() ? 'conectado. Os números chegam toda madrugada.' : 'falta conectar (Configurações > Meta e Google).'}
+                </p>
+                <p>
+                  <strong className="text-ink">Google:</strong> os números chegam pelo script do Google Ads (Configurações &gt; Meta e Google).
+                </p>
+                {metaConfigurado() && cliente.meta_conta && <SincronizarMeta />}
+              </div>
+            </Card>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+              {resumo30.length > 0 && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {resumo30.map((r) => (
+                    <Kpi key={r.plat} label={`${r.plat === 'google' ? 'Google Ads' : 'Meta Ads'} · 30 dias`} value={brl(r.gasto)} hint={`${Math.round(r.conv)} contatos${r.conv ? ` · ${brl(r.gasto / r.conv)} cada` : ''}`} tone="brand" />
+                  ))}
+                </div>
+              )}
+              <Card flush title="Dia a dia (últimos 14 dias)">
+                {porDia.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[480px] text-[13px]">
+                      <thead className="text-left text-[11.5px] uppercase tracking-wide text-muted">
+                        <tr className="border-b border-line">
+                          <th className="px-4 py-2 font-semibold">Dia</th>
+                          <th className="px-2 py-2 text-right font-semibold">Investido</th>
+                          <th className="px-2 py-2 text-right font-semibold">Cliques</th>
+                          <th className="px-2 py-2 text-right font-semibold">Contatos</th>
+                          <th className="px-4 py-2 text-right font-semibold">Custo/contato</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line">
+                        {porDia.map((d) => (
+                          <tr key={d.data}>
+                            <td className="px-4 py-2 tabular-nums">{formatShort(d.data)}</td>
+                            <td className={`px-2 py-2 text-right tabular-nums ${d.gasto === 0 ? 'font-semibold text-danger' : ''}`}>{brl(d.gasto)}</td>
+                            <td className="px-2 py-2 text-right tabular-nums">{d.cliques}</td>
+                            <td className="px-2 py-2 text-right tabular-nums">{Math.round(d.conv)}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{d.conv ? brl(d.gasto / d.conv) : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <Empty>Nenhum número ainda. Coloque o ID das contas ao lado e conecte o Meta e o Google em Configurações &gt; Meta e Google.</Empty>
+                )}
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {tab === 'portal' && (
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <Card
+              flush
+              title="O que preciso do cliente"
+              aside={
+                <form action={adicionarPedidosPadrao.bind(null, id)}>
+                  <button className={btn.ghost}>
+                    <ListPlus size={14} /> Lista padrão
+                  </button>
+                </form>
+              }
+            >
+              {pedidos.length ? <Pedidos pedidos={pedidos} /> : <Empty>Nada pedido ainda. Use a lista padrão (acessos, logo, fotos) ou adicione um item abaixo.</Empty>}
+              <form action={adicionarPedido.bind(null, id)} className="flex flex-wrap gap-2 border-t border-line p-4">
+                <input name="titulo" required placeholder="Novo pedido (ex.: fotos da equipe)" className="field min-w-[180px] flex-1" />
+                <input name="descricao" placeholder="Detalhe (opcional)" className="field min-w-[180px] flex-1" />
+                <button className={btn.primary}>
+                  <Plus size={14} /> Adicionar
+                </button>
+              </form>
+            </Card>
+            <Card title="Link do portal">
+              <p className="mb-3 text-[13px] text-muted">Um link só pro cliente ver o que você precisa dele, pagar as faturas, abrir os relatórios e o contrato. Quando ele marca &quot;Já enviei&quot;, você recebe no celular.</p>
+              <LinkAcoes
+                link={linkPortal}
+                semPdf
+                whatsapp={(cliente.telefone ?? '').replace(/\D/g, '')}
+                mensagem={`Oi, ${(cliente.responsavel ?? cliente.nome).split(' ')[0]}! Esse é o seu portal da Origo: lá ficam as faturas, os relatórios, o contrato e o que eu preciso de você pra começar. Salva aí: ${linkPortal}`}
+              />
+              <form action={novoLinkPortal.bind(null, id)} className="mt-3 border-t border-line pt-3">
+                <button className={btn.ghost}>
+                  <RefreshCcw size={13} /> Gerar link novo (o antigo para de funcionar)
+                </button>
+              </form>
+            </Card>
+          </div>
         )}
 
         {tab === 'dados' && (

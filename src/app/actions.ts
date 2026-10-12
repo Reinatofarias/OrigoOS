@@ -1,10 +1,11 @@
 'use server';
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { checkPassword, createSessionToken, isLoginConfigured, requireAuth, SESSION_COOKIE, SESSION_MAX_AGE } from '@/lib/auth';
+import { APARELHO_COOKIE, checkPassword, createSessionToken, isLoginConfigured, requireAuth, SESSION_COOKIE, SESSION_MAX_AGE } from '@/lib/auth';
+import { codigoValido, lerSeguranca, loginTravado, nomeDoAparelho, quemPediu, registrar } from '@/lib/seguranca';
 import { db, type Charge, type Client, type Contract, type Contratante, type ItemProposta, type LeadStatus, type Prioridade, type Proposal, type Service, type TaskStatus, type TaskTemplate } from '@/lib/db';
 import { addDays, monthRange, today } from '@/lib/dates';
 import { ESPERA, NICHO, normalizeWhatsapp, type Passo } from '@/lib/prospeccao';
@@ -13,19 +14,38 @@ import { criarOnboarding } from '@/lib/modelos';
 import { criarContrato, lerEmpresa } from '@/lib/contratos';
 import { clausulas } from '@/lib/contrato';
 import { chavesPush, enviarParaTodos, resumoDoDia } from '@/lib/push';
+import { somaDoMes } from '@/lib/anuncios';
 import { AsaasErro, buscarCobranca, camposDoPagamento, emitirCobranca, garantirCliente, removerCobranca } from '@/lib/asaas';
 
-export async function login(_: unknown, form: FormData) {
+export async function login(_: unknown, form: FormData): Promise<{ erro?: string; pedirCodigo?: boolean } | null> {
   if (!isLoginConfigured()) return { erro: 'Login ainda não configurado: defina ORIGO_PASSWORD e ORIGO_SESSION_SECRET na Vercel.' };
-  if (!checkPassword(form.get('senha'))) return { erro: 'Senha incorreta.' };
+  const supa = db();
+  const quem = await quemPediu();
+  if (await loginTravado(supa, quem.ip)) {
+    await registrar(supa, 'login_travado', quem);
+    return { erro: 'Muitas tentativas erradas. Espere 15 minutos e tente de novo.' };
+  }
+  const seg = await lerSeguranca(supa);
+  if (!checkPassword(form.get('senha'))) {
+    await registrar(supa, 'login_falhou', quem);
+    return { erro: 'Senha incorreta.', pedirCodigo: seg.totp_ativo };
+  }
+  if (seg.totp_ativo && !codigoValido(seg.totp_secret, form.get('codigo'))) {
+    await registrar(supa, 'login_falhou', quem);
+    return { erro: form.get('codigo') ? 'Código do autenticador errado ou vencido.' : 'Digite o código do app autenticador.', pedirCodigo: true };
+  }
   const store = await cookies();
-  store.set(SESSION_COOKIE, createSessionToken(), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: SESSION_MAX_AGE,
-    path: '/',
-  });
+  // Cada aparelho ganha um código fixo, pra saber quando alguém entra de um aparelho novo.
+  let aparelho = store.get(APARELHO_COOKIE)?.value;
+  const { count } = aparelho ? await supa.from('access_log').select('id', { count: 'exact', head: true }).eq('evento', 'login').eq('aparelho', aparelho) : { count: 0 };
+  if (!aparelho) aparelho = randomUUID();
+  await registrar(supa, 'login', { ...quem, aparelho });
+  if (!count) {
+    await enviarParaTodos(supa, { title: 'Novo acesso ao Origo OS', body: `Entraram de um aparelho novo: ${nomeDoAparelho(quem.navegador)} (IP ${quem.ip}). Se não foi você, saia de todos os aparelhos e troque a senha.`, url: '/configuracoes?tab=seguranca' }).catch(() => null);
+  }
+  const opcoes = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' };
+  store.set(APARELHO_COOKIE, aparelho, { ...opcoes, maxAge: 400 * 24 * 60 * 60 });
+  store.set(SESSION_COOKIE, createSessionToken(seg.sessao_versao), { ...opcoes, maxAge: SESSION_MAX_AGE });
   redirect('/');
 }
 
@@ -84,9 +104,15 @@ export async function updateTask(
     campos.status === undefined
       ? {}
       : { feita: campos.status === 'done', feita_em: campos.status === 'done' ? new Date().toISOString() : null };
-  await db().from('tasks').update({ ...campos, ...extra }).eq('id', id);
+  const { data: t } = await db().from('tasks').update({ ...campos, ...extra }).eq('id', id).select('titulo, client_id').maybeSingle();
+  // Concluir feedback, reunião ou ligação com um cliente conta como contato (saúde do cliente).
+  if (campos.status === 'done' && t?.client_id && CONTATO.test(t.titulo)) {
+    await db().from('clients').update({ ultimo_contato: today() }).eq('id', t.client_id);
+  }
   refresh();
 }
+
+const CONTATO = /feedback|reuni|call|ligar|liga[çc][ãa]o|conversa|alinhamento|relat[óo]rio/i;
 
 export async function deleteTask(id: string) {
   await requireAuth();
@@ -605,7 +631,7 @@ export async function capturarLead(campos: { nome: string; whatsapp: string; not
   const { data: last } = await db().from('leads').select('ordem').order('ordem', { ascending: false }).limit(1);
   await db()
     .from('leads')
-    .insert({ nome, nicho: 'outro', whatsapp, whatsapp_confirmado: !!whatsapp, notas: campos.notas, ordem: (last?.[0]?.ordem ?? 0) + 1 });
+    .insert({ nome, nicho: 'outro', whatsapp, whatsapp_confirmado: !!whatsapp, notas: campos.notas, origem: 'captura', ordem: (last?.[0]?.ordem ?? 0) + 1 });
   refresh();
 }
 
@@ -738,9 +764,12 @@ export async function novoRelatorio(clientId: string, form: FormData) {
   if (existe) redirect(`/relatorios/${existe.id}`);
   // Começa com o mesmo nome de conversão do relatório anterior.
   const { data: anterior } = await supa.from('reports').select('conversao_nome').eq('client_id', clientId).order('competencia', { ascending: false }).limit(1).maybeSingle();
+  // Se os números do Meta/Google já chegaram, o relatório nasce preenchido.
+  const soma = await somaDoMes(supa, clientId, competencia);
+  const numeros = soma.tem ? soma.total : {};
   const { data } = await supa
     .from('reports')
-    .insert({ client_id: clientId, competencia, conversao_nome: anterior?.conversao_nome ?? 'Contatos' })
+    .insert({ client_id: clientId, competencia, conversao_nome: anterior?.conversao_nome ?? 'Contatos', ...numeros })
     .select('id')
     .single();
   refresh();
@@ -758,7 +787,8 @@ export async function salvarRelatorio(
 
 export async function marcarRelatorioEnviado(id: string) {
   await requireAuth();
-  await db().from('reports').update({ status: 'enviado', updated_at: agora() }).eq('id', id);
+  const { data } = await db().from('reports').update({ status: 'enviado', updated_at: agora() }).eq('id', id).select('client_id').maybeSingle();
+  if (data) await db().from('clients').update({ ultimo_contato: today() }).eq('id', data.client_id);
   refresh();
 }
 

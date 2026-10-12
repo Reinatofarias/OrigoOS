@@ -1,13 +1,16 @@
 import Link from 'next/link';
-import { ArrowRight, MessageCircle, ListChecks, KanbanSquare, Wallet, Target } from 'lucide-react';
+import { ArrowRight, ListChecks, KanbanSquare, Wallet, Target } from 'lucide-react';
 import { db, keyProblem, type Charge, type Client, type Lead, type Task } from '@/lib/db';
 import { addDays, formatDay, formatShort, monthRange, today } from '@/lib/dates';
 import { brl, situacao } from '@/lib/format';
 import { DIA_BASE, notaDoDia } from '@/lib/rotina';
 import { garantirRecorrentes } from '@/lib/modelos';
 import { lerMetas } from '@/lib/metas';
-import { NICHO, proximoPasso } from '@/lib/prospeccao';
-import { Avatar, Badge, Body, Card, Empty, Kpi } from '@/components/ui';
+import { mensagem, NICHO, proximoPasso } from '@/lib/prospeccao';
+import { lerModelos } from '@/lib/mensagens';
+import { NIVEL, saudeDosClientes } from '@/lib/saude';
+import ProspeccaoHoje from '@/components/prospeccao-hoje';
+import { Badge, Body, Card, Empty, Kpi } from '@/components/ui';
 import { TodayTasks } from '@/components/tasks';
 import RoutineToggle from '@/components/routine';
 
@@ -27,13 +30,15 @@ export default async function InicioPage() {
     supa.from('tasks').select('*').lte('data', hoje).or(`status.neq.done,data.eq.${hoje}`).order('data').order('created_at'),
     supa.from('clients').select('*').eq('ativo', true).order('nome'),
     lerMetas(supa).then((m) => ({ data: m, error: null })),
+    lerModelos(supa).then((m) => ({ data: m, error: null })),
+    saudeDosClientes(supa, hoje).then((m) => ({ data: m, error: null })),
     supa.from('leads').select('*').in('status', ['m1', 'm2', 'm3', 'respondeu', 'call', 'proposta']).lte('proxima_acao', hoje).order('proxima_acao'),
     supa.from('leads').select('*').eq('status', 'novo').order('ordem').limit(META_DIA),
     supa.from('leads').select('valor, status').not('status', 'in', '(fechou,perdido)'),
     supa.from('charges').select('*').eq('status', 'pendente').lte('vencimento', addDays(hoje, 7)).order('vencimento'),
     supa.from('charges').select('valor, status, vencimento').gte('vencimento', start).lte('vencimento', end).neq('status', 'cancelado'),
   ]);
-  const [{ data: ts }, { data: cs }, { data: metas }, { data: fu }, { data: nv }, { data: abertos }, { data: proximas }, { data: mes }] = resultados;
+  const [{ data: ts }, { data: cs }, { data: metas }, { data: modelos }, { data: saude }, { data: fu }, { data: nv }, { data: abertos }, { data: proximas }, { data: mes }] = resultados;
   const erroBanco = keyProblem() ?? resultados.find((r) => r.error)?.error?.message;
 
   const todas = (ts ?? []) as Task[];
@@ -98,35 +103,43 @@ export default async function InicioPage() {
                   Sem leads pra hoje. <Link href="/comercial" className="font-semibold text-brand">Abrir o funil</Link>
                 </Empty>
               ) : (
-                <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line">
-                  {[...followups, ...novos].map((l) => {
+                <ProspeccaoHoje
+                  leads={[...followups, ...novos].map((l) => {
                     const passo = proximoPasso(l.status);
-                    return (
-                      <li key={l.id} className="flex items-center gap-3 py-2.5">
-                        <Avatar nome={l.nome} size={30} />
-                        <Link href={`/comercial/${l.id}`} className="min-w-0 flex-1">
-                          <span className="block truncate text-[13.5px] font-semibold hover:text-brand">{l.nome}</span>
-                          <span className="block truncate text-[12px] text-muted">{[l.cidade, NICHO[l.nicho]].filter(Boolean).join(' · ')}</span>
-                        </Link>
-                        {passo ? (
-                          <Badge tone={l.status === 'novo' ? 'info' : 'warn'}>Mandar {passo.toUpperCase()}</Badge>
-                        ) : (
-                          <Badge tone="brand">Retornar</Badge>
-                        )}
-                        {l.whatsapp && (
-                          <a href={`https://wa.me/${l.whatsapp}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp de ${l.nome}`} className="grid size-8 place-items-center rounded-lg text-wa hover:bg-success-soft">
-                            <MessageCircle size={16} />
-                          </a>
-                        )}
-                      </li>
-                    );
+                    return { id: l.id, nome: l.nome, whatsapp: l.whatsapp, status: l.status, sub: [l.cidade, NICHO[l.nicho]].filter(Boolean).join(' · '), passo, texto: passo ? mensagem(passo, l, modelos) : null };
                   })}
-                </ul>
+                />
               )}
             </Card>
           </div>
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+            <Card title="Saúde dos clientes" aside={<Link href="/clientes" className="hover:text-ink">{saude.filter((c) => c.nivel === 'ok').length}/{saude.length} em dia</Link>}>
+              {saude.every((c) => c.nivel === 'ok') ? (
+                <Empty>Todos os clientes em dia.</Empty>
+              ) : (
+                <ul className="grid grid-cols-[minmax(0,1fr)] gap-3">
+                  {saude
+                    .filter((c) => c.nivel !== 'ok')
+                    .map((c) => (
+                      <li key={c.client_id}>
+                        <Link href={`/clientes/${c.client_id}`} className="group flex items-center gap-2">
+                          <span className="size-2 shrink-0 rounded-full" style={{ background: NIVEL[c.nivel].cor }} />
+                          <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold group-hover:text-brand">{c.nome}</span>
+                          <Badge tone={NIVEL[c.nivel].tone}>{NIVEL[c.nivel].label}</Badge>
+                        </Link>
+                        <ul className="mt-1 grid gap-0.5 pl-4">
+                          {c.alertas.slice(0, 3).map((a) => (
+                            <li key={a.texto} className={`text-[12.5px] ${a.nivel === 'risco' ? 'text-danger' : 'text-muted'}`}>
+                              {a.texto}
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </Card>
             {rotina.length > 0 && (
               <Card title="Rotina de tráfego" aside={<Link href="/configuracoes?tab=rotina" className="hover:text-ink">{rotinaFeita}/{rotina.length}</Link>}>
                 <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
