@@ -6,7 +6,8 @@ import { CATEGORIAS, brl, situacao } from '@/lib/format';
 import { Body, Card, Empty, Kpi, PageHeader } from '@/components/ui';
 import { ChargeTable } from '@/components/charges';
 import FormDialog, { Field } from '@/components/dialog';
-import { GenerateButton, DeleteExpense } from './buttons';
+import { GenerateButton, DeleteExpense, EmitirMesButton, SincronizarButton } from './buttons';
+import { asaasConfigurado } from '@/lib/asaas';
 import { addExpense } from '@/app/actions';
 
 export default async function FinanceiroPage({ searchParams }: PageProps<'/financeiro'>) {
@@ -34,6 +35,9 @@ export default async function FinanceiroPage({ searchParams }: PageProps<'/finan
   const comMensalidade = new Set(cobrancas.filter((c) => c.competencia === ym).map((c) => c.client_id));
   const faltam = (cs ?? []).filter((c) => c.ativo && Number(c.mensalidade) > 0 && !comMensalidade.has(c.id)).length;
   const pct = previsto ? Math.round((recebido / previsto) * 100) : 0;
+  const asaas = asaasConfigurado();
+  const paraEmitir = cobrancas.filter((c) => c.status === 'pendente' && !c.asaas_id).length;
+  const noAsaas = cobrancas.some((c) => c.status === 'pendente' && c.asaas_id);
 
   return (
     <>
@@ -47,6 +51,8 @@ export default async function FinanceiroPage({ searchParams }: PageProps<'/finan
             <ChevronRight size={16} />
           </Link>
         </div>
+        {asaas && noAsaas && <SincronizarButton />}
+        {asaas && paraEmitir > 0 && <EmitirMesButton ym={ym} qtd={paraEmitir} />}
         {faltam > 0 && <GenerateButton ym={ym} faltam={faltam} />}
       </PageHeader>
       <Body>
@@ -63,8 +69,17 @@ export default async function FinanceiroPage({ searchParams }: PageProps<'/finan
           <div className="bg-grad h-full rounded-full" style={{ width: `${pct}%` }} />
         </div>
 
+        {!asaas && (
+          <p className="rounded-xl border border-line bg-surface px-4 py-3 text-[13px] text-muted">
+            Quer que o cliente receba Pix ou boleto e a baixa seja automática?{' '}
+            <Link href="/configuracoes?tab=asaas" className="font-semibold text-brand">
+              Ligar o Asaas
+            </Link>
+          </p>
+        )}
+
         <Card flush title={`Cobranças de ${formatMonth(ym).toLowerCase()}`} aside={faltam > 0 ? `${faltam} cliente(s) sem mensalidade gerada` : 'Mensalidades geradas'}>
-          <ChargeTable charges={cobrancas} hoje={hoje} nomes={nomes} />
+          <ChargeTable charges={cobrancas} hoje={hoje} nomes={nomes} asaas={asaas} />
         </Card>
 
         <Card

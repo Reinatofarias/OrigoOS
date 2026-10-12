@@ -71,6 +71,9 @@ export type Client = {
   dia_vencimento: number;
   inicio: string | null;
   observacoes: string | null;
+  servicos: ItemProposta[];
+  recorrentes: boolean;
+  asaas_customer_id: string | null;
   created_at: string;
 };
 
@@ -87,6 +90,8 @@ export type Task = {
   prioridade: Prioridade;
   feita: boolean;
   feita_em: string | null;
+  origem: 'manual' | 'onboarding' | 'recorrente';
+  template_id: string | null;
   created_at: string;
 };
 
@@ -121,6 +126,9 @@ export type Charge = {
   status: 'pendente' | 'pago' | 'cancelado';
   pago_em: string | null;
   forma: 'pix' | 'boleto' | 'transferencia' | 'cartao' | 'dinheiro' | null;
+  asaas_id: string | null;
+  asaas_url: string | null;
+  asaas_status: string | null;
 };
 
 export type Expense = {
@@ -131,3 +139,67 @@ export type Expense = {
   data: string;
   pago: boolean;
 };
+
+export type Plataforma = 'google' | 'meta' | 'google_meta';
+
+export type Service = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  preco: number;
+  cobranca: 'mensal' | 'unico';
+  plataforma: Plataforma | null;
+  ativo: boolean;
+  ordem: number;
+};
+
+export type ItemProposta = {
+  service_id: string | null;
+  nome: string;
+  descricao: string | null;
+  valor: number;
+  cobranca: 'mensal' | 'unico';
+  plataforma: Plataforma | null;
+};
+
+export type Proposal = {
+  id: string;
+  numero: number;
+  token: string;
+  lead_id: string | null;
+  client_id: string | null;
+  titulo: string;
+  introducao: string | null;
+  itens: ItemProposta[];
+  desconto: number;
+  validade: string | null;
+  condicoes: string | null;
+  status: 'rascunho' | 'enviada' | 'aceita' | 'recusada';
+  aceita_em: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaskTemplate = {
+  id: string;
+  tipo: 'onboarding' | 'recorrente';
+  titulo: string;
+  descricao: string | null;
+  prioridade: Prioridade;
+  dias: number;
+  frequencia: 'semanal' | 'mensal';
+  dia_semana: number | null;
+  dia_mes: number | null;
+  plataforma: 'todas' | 'google' | 'meta';
+  ativo: boolean;
+  ordem: number;
+};
+
+export type Metas = {
+  clientes: number;
+  receita: number;
+  custo_contratacao: number;
+  prazo: string | null;
+};
+
+export const METAS_PADRAO: Metas = { clientes: 15, receita: 30000, custo_contratacao: 3000, prazo: null };

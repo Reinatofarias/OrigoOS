@@ -3,7 +3,9 @@ import { ArrowRight, MessageCircle, ListChecks, KanbanSquare, Wallet, Target } f
 import { db, keyProblem, type Charge, type Client, type Lead, type Task } from '@/lib/db';
 import { addDays, formatDay, formatShort, monthRange, today } from '@/lib/dates';
 import { brl, situacao } from '@/lib/format';
-import { DIA_BASE, notaDoDia, tarefasDeTrafego } from '@/lib/rotina';
+import { DIA_BASE, notaDoDia } from '@/lib/rotina';
+import { garantirRecorrentes } from '@/lib/modelos';
+import { lerMetas } from '@/lib/metas';
 import { NICHO, proximoPasso } from '@/lib/prospeccao';
 import { Avatar, Badge, Body, Card, Empty, Kpi } from '@/components/ui';
 import { TodayTasks } from '@/components/tasks';
@@ -20,30 +22,32 @@ export default async function InicioPage() {
   const hoje = today();
   const { start, end } = monthRange(hoje.slice(0, 7));
   const supa = db();
+  await garantirRecorrentes(supa);
   const resultados = await Promise.all([
-    supa.from('tasks').select('*').neq('status', 'done').lte('data', hoje).order('data').order('created_at'),
+    supa.from('tasks').select('*').lte('data', hoje).or(`status.neq.done,data.eq.${hoje}`).order('data').order('created_at'),
     supa.from('clients').select('*').eq('ativo', true).order('nome'),
-    supa.from('routine_checks').select('client_id, tipo').eq('data', hoje),
+    lerMetas(supa).then((m) => ({ data: m, error: null })),
     supa.from('leads').select('*').in('status', ['m1', 'm2', 'm3', 'respondeu', 'call', 'proposta']).lte('proxima_acao', hoje).order('proxima_acao'),
     supa.from('leads').select('*').eq('status', 'novo').order('ordem').limit(META_DIA),
     supa.from('leads').select('valor, status').not('status', 'in', '(fechou,perdido)'),
     supa.from('charges').select('*').eq('status', 'pendente').lte('vencimento', addDays(hoje, 7)).order('vencimento'),
     supa.from('charges').select('valor, status, vencimento').gte('vencimento', start).lte('vencimento', end).neq('status', 'cancelado'),
   ]);
-  const [{ data: ts }, { data: cs }, { data: checks }, { data: fu }, { data: nv }, { data: abertos }, { data: proximas }, { data: mes }] = resultados;
+  const [{ data: ts }, { data: cs }, { data: metas }, { data: fu }, { data: nv }, { data: abertos }, { data: proximas }, { data: mes }] = resultados;
   const erroBanco = keyProblem() ?? resultados.find((r) => r.error)?.error?.message;
 
-  const tarefas = (ts ?? []) as Task[];
+  const todas = (ts ?? []) as Task[];
+  const tarefas = todas.filter((t) => t.origem !== 'recorrente' && t.status !== 'done');
+  const rotina = todas.filter((t) => t.origem === 'recorrente');
   const clientes = (cs ?? []) as Client[];
   const followups = (fu ?? []) as Lead[];
   const novos = (nv ?? []) as Lead[];
   const cobrancas = (proximas ?? []) as Charge[];
   const nomes = Object.fromEntries(clientes.map((c) => [c.id, c.nome]));
-  const atrasadas = tarefas.filter((t) => t.data && t.data < hoje).length;
-  const rotina = tarefasDeTrafego(hoje);
-  const feito = new Set((checks ?? []).map((c) => `${c.client_id}:${c.tipo}`));
-  const rotinaTotal = rotina.length * clientes.length;
-  const rotinaFeita = clientes.reduce((s, c) => s + rotina.filter((r) => feito.has(`${c.id}:${r.tipo}`)).length, 0);
+  const abertasHoje = todas.filter((t) => t.status !== 'done');
+  const atrasadas = abertasHoje.filter((t) => t.data && t.data < hoje).length;
+  const rotinaFeita = rotina.filter((t) => t.status === 'done').length;
+  const grupos = [...new Set(rotina.map((t) => t.titulo))];
   const pipeline = (abertos ?? []).reduce((s, l) => s + Number(l.valor ?? 0), 0);
   const aReceber = (mes ?? []).filter((c) => c.status === 'pendente').reduce((s, c) => s + Number(c.valor), 0);
   const vencido = cobrancas.filter((c) => situacao(c, hoje) === 'vencido').reduce((s, c) => s + Number(c.valor), 0);
@@ -58,6 +62,17 @@ export default async function InicioPage() {
             {saudacao()}, <span className="text-grad">Renato</span>
           </h1>
           <p className="mt-0.5 text-[13.5px] text-sidebar-ink">{notaDoDia(hoje)}</p>
+          {metas && (
+            <Link href="/metas" className="mt-4 flex max-w-sm items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 hover:bg-white/[0.07]">
+              <span className="text-[12.5px] text-sidebar-ink">Meta</span>
+              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                <span className="bg-grad block h-full rounded-full" style={{ width: `${Math.min(100, (clientes.length / metas.clientes) * 100)}%` }} />
+              </span>
+              <span className="text-[12.5px] font-semibold">
+                {clientes.length} de {metas.clientes} clientes
+              </span>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -65,14 +80,14 @@ export default async function InicioPage() {
         {erroBanco && <p className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-[13px] text-danger">Não consegui ler o banco: {erroBanco}</p>}
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Kpi label="Tarefas pra hoje" value={tarefas.length} hint={atrasadas ? `${atrasadas} atrasada(s)` : 'Nenhuma atrasada'} tone={atrasadas ? 'danger' : undefined} icon={<ListChecks size={16} />} />
+          <Kpi label="Tarefas pra hoje" value={abertasHoje.length} hint={atrasadas ? `${atrasadas} atrasada(s)` : 'Nenhuma atrasada'} tone={atrasadas ? 'danger' : undefined} icon={<ListChecks size={16} />} />
           <Kpi label="Prospecção de hoje" value={followups.length + novos.length} hint={`${followups.length} follow-ups · ${novos.length} novos`} icon={<Target size={16} />} />
           <Kpi label="Em negociação" value={brl(pipeline, false)} hint={`${abertos?.length ?? 0} negócios no funil`} tone="brand" icon={<KanbanSquare size={16} />} />
           <Kpi label="A receber no mês" value={brl(aReceber, false)} hint={vencido ? `${brl(vencido)} vencido` : 'Nada vencido'} tone={vencido ? 'danger' : 'warn'} icon={<Wallet size={16} />} />
         </div>
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="grid gap-6">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
             <Card flush title="Minhas tarefas de hoje" aside={<Link href="/tarefas" className="font-semibold text-brand">Ver todas</Link>}>
               <TodayTasks tasks={tarefas} clientes={clientes} hoje={hoje} />
             </Card>
@@ -83,7 +98,7 @@ export default async function InicioPage() {
                   Sem leads pra hoje. <Link href="/comercial" className="font-semibold text-brand">Abrir o funil</Link>
                 </Empty>
               ) : (
-                <ul className="grid divide-y divide-line">
+                <ul className="grid grid-cols-[minmax(0,1fr)] divide-y divide-line">
                   {[...followups, ...novos].map((l) => {
                     const passo = proximoPasso(l.status);
                     return (
@@ -111,18 +126,27 @@ export default async function InicioPage() {
             </Card>
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
             {rotina.length > 0 && (
-              <Card title="Rotina de tráfego" aside={`${rotinaFeita}/${rotinaTotal}`}>
+              <Card title="Rotina de tráfego" aside={<Link href="/configuracoes?tab=rotina" className="hover:text-ink">{rotinaFeita}/{rotina.length}</Link>}>
                 <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                  <div className="bg-grad h-full" style={{ width: `${rotinaTotal ? (rotinaFeita / rotinaTotal) * 100 : 0}%` }} />
+                  <div className="bg-grad h-full" style={{ width: `${(rotinaFeita / rotina.length) * 100}%` }} />
                 </div>
-                {rotina.map((r) => (
-                  <div key={r.tipo} className="mb-2 last:mb-0">
-                    <p className="mb-1 px-2 text-[11.5px] font-semibold uppercase tracking-wide text-muted">{r.titulo}</p>
-                    {clientes.map((c) => (
-                      <RoutineToggle key={c.id} clientId={c.id} tipo={r.tipo} label={c.nome} feito={feito.has(`${c.id}:${r.tipo}`)} />
-                    ))}
+                {grupos.map((g) => (
+                  <div key={g} className="mb-2 last:mb-0">
+                    <p className="mb-1 px-2 text-[11.5px] font-semibold uppercase tracking-wide text-muted">{g}</p>
+                    {rotina
+                      .filter((t) => t.titulo === g)
+                      .map((t) => (
+                        <RoutineToggle
+                          key={`${t.id}-${t.status}`}
+                          taskId={t.id}
+                          label={nomes[t.client_id ?? ''] ?? 'Cliente'}
+                          feito={t.status === 'done'}
+                          sub={t.data && t.data < hoje ? `Atrasada desde ${formatShort(t.data)}` : undefined}
+                          atrasada
+                        />
+                      ))}
                   </div>
                 ))}
               </Card>

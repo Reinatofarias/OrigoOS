@@ -52,7 +52,7 @@ export function PageHeader({
 }
 
 export function Body({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
-  return <main className={`mx-auto grid w-full gap-6 px-4 py-6 md:px-8 ${wide ? '' : 'max-w-[1280px]'}`}>{children}</main>;
+  return <main className={`mx-auto grid w-full grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6 md:px-8 ${wide ? '' : 'max-w-[1280px]'}`}>{children}</main>;
 }
 
 export function Card({

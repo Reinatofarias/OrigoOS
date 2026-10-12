@@ -2,9 +2,10 @@
 
 import { useOptimistic, useTransition } from 'react';
 import { Check } from 'lucide-react';
-import { toggleRoutine } from '@/app/actions';
+import { updateTask } from '@/app/actions';
 
-export default function RoutineToggle({ clientId, tipo, label, feito, sub }: { clientId: string; tipo: string; label: string; feito: boolean; sub?: string }) {
+// Caixinha de marcar das tarefas recorrentes (rotina de tráfego).
+export default function RoutineToggle({ taskId, label, feito, sub, atrasada }: { taskId: string; label: string; feito: boolean; sub?: string; atrasada?: boolean }) {
   const [otimista, setOtimista] = useOptimistic(feito);
   const [, start] = useTransition();
   return (
@@ -13,7 +14,7 @@ export default function RoutineToggle({ clientId, tipo, label, feito, sub }: { c
       onClick={() =>
         start(async () => {
           setOtimista(!otimista);
-          await toggleRoutine(clientId, tipo, !otimista);
+          await updateTask(taskId, { status: otimista ? 'todo' : 'done' });
         })
       }
       aria-pressed={otimista}
@@ -26,7 +27,7 @@ export default function RoutineToggle({ clientId, tipo, label, feito, sub }: { c
       </span>
       <span className="min-w-0">
         <span className={`block truncate text-[13.5px] font-medium ${otimista ? 'text-muted line-through' : ''}`}>{label}</span>
-        {sub && <span className="block truncate text-[12px] text-muted">{sub}</span>}
+        {sub && <span className={`block truncate text-[12px] ${atrasada && !otimista ? 'font-semibold text-danger' : 'text-muted'}`}>{sub}</span>}
       </span>
     </button>
   );
