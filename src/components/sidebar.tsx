@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, ListChecks, KanbanSquare, Building2, Wallet, LogOut, Activity } from 'lucide-react';
 import { logout } from '@/app/actions';
-import { Logo, LogoMark } from './logo';
+import { Logo } from './logo';
 
 const LINKS = [
   { href: '/', label: 'Início', icon: Home },
@@ -25,7 +25,7 @@ export default function Sidebar() {
       {/* Desktop: menu lateral escuro */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-sidebar px-3 py-5 md:flex">
         <div className="px-2">
-          <Logo />
+          <Logo height={40} />
         </div>
         <p className="mt-8 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-ink/60">Workspace</p>
         <nav className="mt-2 grid gap-0.5" aria-label="Principal">
@@ -65,10 +65,7 @@ export default function Sidebar() {
 
       {/* Celular: barra de cima com a marca e barra de baixo com os módulos */}
       <header className="sticky top-0 z-30 flex items-center justify-between bg-sidebar px-4 py-3 md:hidden">
-        <span className="flex items-center gap-2">
-          <LogoMark size={28} id="origo-g-mob" />
-          <span className="text-[16px] font-bold text-white">origo</span>
-        </span>
+        <Logo height={28} />
         <form action={logout}>
           <button className="rounded-lg p-2 text-sidebar-ink" aria-label="Sair">
             <LogOut size={18} />

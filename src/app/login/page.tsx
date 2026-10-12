@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { isAuthenticated } from '@/lib/auth';
 import LoginForm from './login-form';
@@ -5,12 +6,21 @@ import LoginForm from './login-form';
 export default async function LoginPage() {
   if (await isAuthenticated()) redirect('/');
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
-      <div>
-        <h1 className="font-display text-3xl font-extrabold">Origo OS</h1>
-        <p className="text-muted">Sistema interno da Origo Company.</p>
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,#1a1450_0%,#05050f_60%)] px-4 py-10">
+      <div className="w-full max-w-sm">
+        <Image
+          src="/brand/origo-os-vertical.png"
+          alt="Origo OS"
+          width={240}
+          height={208}
+          priority
+          className="mx-auto h-auto w-[200px] sm:w-[240px]"
+        />
+        <p className="mt-4 text-center text-[14px] text-sidebar-ink">Sistema interno da Origo Company</p>
+        <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl backdrop-blur">
+          <LoginForm />
+        </div>
       </div>
-      <LoginForm />
     </main>
   );
 }
