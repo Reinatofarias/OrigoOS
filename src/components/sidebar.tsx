@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListChecks, KanbanSquare, Building2, Wallet, LogOut } from 'lucide-react';
+import { Home, ListChecks, KanbanSquare, Building2, Wallet, LogOut, Activity } from 'lucide-react';
 import { logout } from '@/app/actions';
 import { Logo, LogoMark } from './logo';
 
@@ -52,7 +52,10 @@ export default function Sidebar() {
               </div>
             </div>
           </div>
-          <form action={logout}>
+          <Link href="/status" className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white">
+            <Activity size={16} /> Status da conexão
+          </Link>
+          <form action={logout} className="-mt-3">
             <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white">
               <LogOut size={16} /> Sair
             </button>
