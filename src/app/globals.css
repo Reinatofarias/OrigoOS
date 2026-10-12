@@ -104,14 +104,13 @@ body {
   background: var(--grad);
 }
 
-.text-grad {
-  background: var(--grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
 @layer components {
+  .text-grad {
+    background: var(--grad);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 /* Campos "invisíveis" das linhas de tabela: só aparecem no hover/foco, como no ClickUp. */
 .cell-input {
   appearance: none;

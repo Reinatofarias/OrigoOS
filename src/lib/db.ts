@@ -74,6 +74,7 @@ export type Client = {
   servicos: ItemProposta[];
   recorrentes: boolean;
   asaas_customer_id: string | null;
+  endereco: string | null;
   created_at: string;
 };
 
@@ -203,3 +204,64 @@ export type Metas = {
 };
 
 export const METAS_PADRAO: Metas = { clientes: 15, receita: 30000, custo_contratacao: 3000, prazo: null };
+
+export type Contratante = {
+  nome?: string;
+  documento?: string;
+  endereco?: string;
+  email?: string;
+  telefone?: string;
+  representante?: string;
+  representante_cpf?: string;
+};
+
+export type Contract = {
+  id: string;
+  numero: number;
+  token: string;
+  proposal_id: string | null;
+  lead_id: string | null;
+  client_id: string | null;
+  contratante: Contratante;
+  itens: ItemProposta[];
+  desconto: number;
+  dia_vencimento: number;
+  status: 'aguardando' | 'assinado' | 'cancelado';
+  conteudo: string | null;
+  hash: string | null;
+  assinado_em: string | null;
+  assinado_nome: string | null;
+  assinado_documento: string | null;
+  assinado_ip: string | null;
+  assinado_navegador: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Empresa = {
+  nome: string;
+  responsavel: string;
+  documento: string;
+  endereco: string;
+  cidade: string;
+  email: string;
+};
+
+export const EMPRESA_PADRAO: Empresa = { nome: 'Origo Company', responsavel: 'Renato Farias', documento: '', endereco: '', cidade: 'Igarassu-PE', email: '' };
+
+export type Report = {
+  id: string;
+  token: string;
+  client_id: string;
+  competencia: string;
+  investimento: number | null;
+  impressoes: number | null;
+  cliques: number | null;
+  conversoes: number | null;
+  conversao_nome: string;
+  destaques: string | null;
+  proximos_passos: string | null;
+  status: 'rascunho' | 'enviado';
+  created_at: string;
+  updated_at: string;
+};

@@ -6,9 +6,12 @@ import { Body, Card, PageHeader, Tabs } from '@/components/ui';
 import FormDialog, { Field } from '@/components/dialog';
 import { ServiceRow, TemplateRow } from '@/components/config';
 import { PRIORIDADE } from '@/components/tasks';
-import { addService, addTemplate } from '@/app/actions';
+import { addService, addTemplate, salvarEmpresa } from '@/app/actions';
+import { lerEmpresa } from '@/lib/contratos';
+import Lembrete from '@/components/lembrete';
+import { btn } from '@/components/ui';
 
-const TABS = ['servicos', 'onboarding', 'rotina', 'asaas'] as const;
+const TABS = ['servicos', 'onboarding', 'rotina', 'empresa', 'app', 'asaas'] as const;
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 function Cabecalho({ cols, nomes }: { cols: string; nomes: string[] }) {
@@ -102,6 +105,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
   const h = await headers();
   const webhook = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}/api/asaas`;
   const ambiente = asaasAmbiente();
+  const empresa = await lerEmpresa(supa);
 
   return (
     <>
@@ -113,6 +117,8 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
             { key: 'servicos', label: 'Serviços e preços', href: '/configuracoes', count: servicos.length },
             { key: 'onboarding', label: 'Onboarding', href: '/configuracoes?tab=onboarding', count: onboarding.length },
             { key: 'rotina', label: 'Tarefas recorrentes', href: '/configuracoes?tab=rotina', count: rotina.length },
+            { key: 'empresa', label: 'Dados da Origo', href: '/configuracoes?tab=empresa' },
+            { key: 'app', label: 'App e lembrete', href: '/configuracoes?tab=app' },
             { key: 'asaas', label: 'Asaas', href: '/configuracoes?tab=asaas' },
           ]}
         />
@@ -184,6 +190,62 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
               <TemplateRow key={`${t.id}-${t.titulo}`} t={t} />
             ))}
           </Card>
+        )}
+
+        {tab === 'empresa' && (
+          <Card title="Dados da Origo nos contratos">
+            <form action={salvarEmpresa} className="grid max-w-2xl gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Nome da empresa">
+                  <input name="nome" defaultValue={empresa.nome} className="field" />
+                </Field>
+                <Field label="CNPJ (ou CPF)">
+                  <input name="documento" defaultValue={empresa.documento} className="field" />
+                </Field>
+                <Field label="Responsável">
+                  <input name="responsavel" defaultValue={empresa.responsavel} className="field" />
+                </Field>
+                <Field label="E-mail">
+                  <input name="email" type="email" defaultValue={empresa.email} className="field" />
+                </Field>
+              </div>
+              <Field label="Endereço completo">
+                <input name="endereco" defaultValue={empresa.endereco} className="field" />
+              </Field>
+              <Field label="Cidade do foro">
+                <input name="cidade" defaultValue={empresa.cidade} className="field" />
+              </Field>
+              <p className="text-[12.5px] text-muted">Contratos já assinados não mudam: eles guardam o texto exato do momento da assinatura.</p>
+              <div>
+                <button className={btn.primary}>Salvar</button>
+              </div>
+            </form>
+          </Card>
+        )}
+
+        {tab === 'app' && (
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
+            <Card title="Lembrete das 7h51">
+              <p className="mb-3 text-[13px] text-muted">
+                De segunda a sexta, às 7h51, chega uma notificação com as 3 tarefas mais importantes do dia, os contatos de prospecção e as cobranças vencendo.
+              </p>
+              <Lembrete />
+            </Card>
+            <Card title="Instalar no celular">
+              <ol className="grid list-decimal gap-2 pl-5 text-[13.5px] leading-relaxed">
+                <li>
+                  <strong>iPhone:</strong> abra o sistema no Safari, toque em Compartilhar e depois em &quot;Adicionar à Tela de Início&quot;.
+                </li>
+                <li>
+                  <strong>Android:</strong> abra no Chrome, toque nos três pontinhos e em &quot;Instalar app&quot;.
+                </li>
+                <li>Abra pelo ícone do Origo OS e ligue o lembrete aqui nesta tela, no próprio celular.</li>
+              </ol>
+              <p className="mt-3 text-[13px] text-muted">
+                Em qualquer tela, o botão <strong>+</strong> (ou a tecla N no computador) abre a captura rápida: fale ou escreva &quot;ligar pro Matheus amanhã urgente&quot; e vira tarefa.
+              </p>
+            </Card>
+          </div>
         )}
 
         {tab === 'asaas' && (

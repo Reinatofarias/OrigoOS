@@ -1,7 +1,10 @@
 import { notFound } from 'next/navigation';
-import { Mail, Phone, FileText, CalendarDays, Rocket } from 'lucide-react';
-import { db, type Charge, type Client, type Task } from '@/lib/db';
-import { addDays, formatShort, prazo, today } from '@/lib/dates';
+import Link from 'next/link';
+import { Mail, Phone, FileText, CalendarDays, Rocket, FileSignature, BarChart3, Plus } from 'lucide-react';
+import { db, type Charge, type Client, type Contract, type Report, type Task } from '@/lib/db';
+import { STATUS_CONTRATO, numeroContrato } from '@/lib/contrato';
+import { metricas } from '@/lib/relatorio';
+import { addDays, addMonths, formatMonth, formatShort, prazo, today } from '@/lib/dates';
 import { brl, situacao } from '@/lib/format';
 import { CHECKLIST, PLATAFORMA } from '@/lib/rotina';
 import { garantirRecorrentes } from '@/lib/modelos';
@@ -12,9 +15,9 @@ import { TaskGroups, TaskRow } from '@/components/tasks';
 import RoutineToggle from '@/components/routine';
 import FormDialog, { Field } from '@/components/dialog';
 import ClientFields from '@/components/client-form';
-import { addCharge, aplicarOnboarding, saveClient } from '@/app/actions';
+import { addCharge, aplicarOnboarding, novoRelatorio, saveClient } from '@/app/actions';
 
-const TABS = ['geral', 'cobrancas', 'tarefas', 'dados'] as const;
+const TABS = ['geral', 'cobrancas', 'tarefas', 'relatorios', 'dados'] as const;
 
 export default async function ClientePage({ params, searchParams }: PageProps<'/clientes/[id]'>) {
   const { id } = await params;
@@ -23,11 +26,13 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
   const hoje = today();
   const supa = db();
   await garantirRecorrentes(supa);
-  const [{ data: c }, { data: ch }, { data: ts }, { data: todos }] = await Promise.all([
+  const [{ data: c }, { data: ch }, { data: ts }, { data: todos }, { data: cts }, { data: rps }] = await Promise.all([
     supa.from('clients').select('*').eq('id', id).maybeSingle(),
     supa.from('charges').select('*').eq('client_id', id).order('vencimento', { ascending: false }),
     supa.from('tasks').select('*').eq('client_id', id).order('data', { nullsFirst: false }).order('created_at'),
     supa.from('clients').select('id, nome').order('nome'),
+    supa.from('contracts').select('*').eq('client_id', id).neq('status', 'cancelado').order('created_at', { ascending: false }),
+    supa.from('reports').select('*').eq('client_id', id).order('competencia', { ascending: false }),
   ]);
   if (!c) notFound();
   const cliente = c as Client;
@@ -41,6 +46,9 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
   const onbFeitas = onboarding.filter((t) => t.status === 'done').length;
   const rotina = tarefas.filter((t) => t.origem === 'recorrente' && t.data && t.data >= addDays(hoje, -6) && t.data <= addDays(hoje, 6) && (t.status !== 'done' || t.data >= hoje));
   const asaas = asaasConfigurado();
+  const contratos = (cts ?? []) as Contract[];
+  const relatorios = (rps ?? []) as Report[];
+  const mesPassado = addMonths(hoje.slice(0, 7), -1);
   const plataformas = cliente.plataforma === 'google_meta' ? (['google', 'meta'] as const) : [cliente.plataforma];
   const base = `/clientes/${id}`;
 
@@ -87,6 +95,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
             { key: 'geral', label: 'Visão geral', href: base },
             { key: 'cobrancas', label: 'Cobranças', href: `${base}?tab=cobrancas`, count: cobrancas.length },
             { key: 'tarefas', label: 'Tarefas', href: `${base}?tab=tarefas`, count: abertas.length },
+            { key: 'relatorios', label: 'Relatórios', href: `${base}?tab=relatorios`, count: relatorios.length },
             { key: 'dados', label: 'Dados cadastrais', href: `${base}?tab=dados` },
           ]}
         />
@@ -157,6 +166,19 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                     <p className="text-[13px] text-muted">{cliente.recorrentes ? 'Nenhuma tarefa recorrente nesta semana.' : 'A rotina automática está desligada pra esse cliente.'}</p>
                   )}
                 </Card>
+                <Card title="Contrato">
+                  {contratos.length ? (
+                    contratos.map((ct) => (
+                      <Link key={ct.id} href={`/contratos/${ct.id}`} className="flex items-center gap-2 text-[13px] hover:text-brand">
+                        <FileSignature size={15} className="text-brand" />
+                        <span className="flex-1 font-medium">Contrato Nº {numeroContrato(ct.numero)}</span>
+                        <Badge tone={STATUS_CONTRATO[ct.status].tone}>{STATUS_CONTRATO[ct.status].label}</Badge>
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="text-[13px] text-muted">O contrato é gerado sozinho quando o cliente aceita a proposta.</p>
+                  )}
+                </Card>
                 {cliente.servicos?.length > 0 && (
                   <Card title="Serviços contratados">
                     <ul className="grid gap-2 text-[13px]">
@@ -204,6 +226,43 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
         )}
 
         {tab === 'tarefas' && <TaskGroups tasks={tarefas} clientes={todos ?? []} hoje={hoje} clientId={id} ocultarConcluidas />}
+
+        {tab === 'relatorios' && (
+          <Card
+            flush
+            title="Relatórios mensais"
+            aside={
+              <form action={novoRelatorio.bind(null, id)} className="flex items-center gap-2">
+                <input type="month" name="competencia" defaultValue={mesPassado} aria-label="Mês" className="field w-auto py-1.5" />
+                <button className={btn.primary}>
+                  <Plus size={14} /> Criar relatório
+                </button>
+              </form>
+            }
+          >
+            {relatorios.length ? (
+              <ul className="divide-y divide-line">
+                {relatorios.map((r) => {
+                  const m = metricas(r);
+                  return (
+                    <li key={r.id}>
+                      <Link href={`/relatorios/${r.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-surface-2/60">
+                        <BarChart3 size={18} className="text-brand" />
+                        <span className="min-w-0 flex-1 text-[13.5px] font-semibold">{formatMonth(r.competencia)}</span>
+                        <span className="text-[12.5px] text-muted">
+                          {m.conversoes ?? '—'} {r.conversao_nome.toLowerCase()} · {m.cpa ? `${brl(m.cpa)} cada` : 'sem custo'}
+                        </span>
+                        <Badge tone={r.status === 'enviado' ? 'success' : 'neutral'}>{r.status === 'enviado' ? 'Enviado' : 'Rascunho'}</Badge>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <Empty>Nenhum relatório ainda. Escolha o mês e crie o primeiro, com link pro cliente e PDF.</Empty>
+            )}
+          </Card>
+        )}
 
         {tab === 'dados' && (
           <Card title="Dados cadastrais">

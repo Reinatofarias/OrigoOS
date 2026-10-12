@@ -1,16 +1,20 @@
+import Link from 'next/link';
 import { headers } from 'next/headers';
+import { FileSignature } from 'lucide-react';
+import { gerarContrato } from '@/app/actions';
 import { notFound } from 'next/navigation';
 import { db, type Proposal, type Service } from '@/lib/db';
 import { STATUS_PROPOSTA, numeroProposta } from '@/lib/propostas';
-import { Badge, Body, PageHeader } from '@/components/ui';
+import { Badge, Body, PageHeader, btn } from '@/components/ui';
 import PropostaEditor from '@/components/proposta-editor';
 
 export default async function PropostaPage({ params }: PageProps<'/propostas/[id]'>) {
   const { id } = await params;
   const supa = db();
-  const [{ data }, { data: svs }] = await Promise.all([
+  const [{ data }, { data: svs }, { data: ct }] = await Promise.all([
     supa.from('proposals').select('*, leads(id, nome, contato, cidade, whatsapp)').eq('id', id).maybeSingle(),
     supa.from('services').select('*').eq('ativo', true).order('ordem'),
+    supa.from('contracts').select('id, status').eq('proposal_id', id).neq('status', 'cancelado').maybeSingle(),
   ]);
   if (!data) notFound();
   const p = data as Proposal & { leads: { id: string; nome: string; contato: string | null; cidade: string | null; whatsapp: string | null } | null };
@@ -31,7 +35,21 @@ export default async function PropostaPage({ params }: PageProps<'/propostas/[id
           </span>
         }
         subtitle={lead ? `Para ${lead.nome}` : undefined}
-      />
+      >
+        {ct ? (
+          <Link href={`/contratos/${ct.id}`} className={btn.secondary}>
+            <FileSignature size={15} /> {ct.status === 'assinado' ? 'Contrato assinado' : 'Ver contrato'}
+          </Link>
+        ) : (
+          p.status === 'aceita' && (
+            <form action={gerarContrato.bind(null, p.id)}>
+              <button className={btn.secondary}>
+                <FileSignature size={15} /> Gerar contrato
+              </button>
+            </form>
+          )
+        )}
+      </PageHeader>
       <Body wide>
         <PropostaEditor
           key={p.updated_at}
