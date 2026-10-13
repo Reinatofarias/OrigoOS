@@ -29,7 +29,7 @@ export function ItensDoDia({ eventos, tarefas, compacto }: { eventos: Evento[]; 
               </span>
             )}
           </div>
-          <ApagarEvento id={e.id} titulo={e.titulo} />
+          {!e.soLeitura && <ApagarEvento id={e.id} titulo={e.titulo} />}
         </li>
       ))}
       {tarefas.map((t) => (

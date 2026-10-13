@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { CalendarPlus, Trash2, Video, X } from 'lucide-react';
-import { apagarCompromisso, novoCompromisso } from '@/app/acoes/agenda';
+import { apagarCompromisso, novoCompromisso, registrarAgendamento } from '@/app/acoes/agenda';
+import { linkNovoEvento } from '@/lib/agenda-link';
 import { Field } from './dialog';
 import { btn } from './ui';
 
@@ -14,6 +15,7 @@ export function NovoCompromisso({
   descricao = '',
   taskId,
   variant = 'primary',
+  modo = 'api',
 }: {
   label?: string;
   dia: string;
@@ -21,6 +23,8 @@ export function NovoCompromisso({
   descricao?: string;
   taskId?: string;
   variant?: 'primary' | 'secondary';
+  // api: cria direto pela conta conectada. link: abre o Google Agenda preenchido pra salvar lá.
+  modo?: 'api' | 'link';
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -46,7 +50,9 @@ export function NovoCompromisso({
         </header>
         {pronto !== null ? (
           <div className="grid gap-3 px-5 py-5 text-[14px]">
-            <p className="font-semibold text-success">Pronto, está no seu Google Agenda.</p>
+            <p className="font-semibold text-success">
+              {modo === 'link' ? 'Abri o Google Agenda numa aba nova. Confira e clique em Salvar lá.' : 'Pronto, está no seu Google Agenda.'}
+            </p>
             {pronto && (
               <a href={pronto} target="_blank" rel="noreferrer" className="break-all text-brand underline">
                 {pronto}
@@ -65,6 +71,22 @@ export function NovoCompromisso({
               e.preventDefault();
               // Sem o reset automático do React: se der erro, o que foi digitado continua no formulário.
               const fd = new FormData(e.currentTarget);
+              if (modo === 'link') {
+                const dia = String(fd.get('dia') ?? '');
+                const hora = String(fd.get('hora') ?? '') || null;
+                const convidados = String(fd.get('convidados') ?? '').split(/[\s,;]+/).filter(Boolean);
+                // Abre antes de qualquer espera, senão o navegador bloqueia a aba nova.
+                window.open(
+                  linkNovoEvento({ titulo: String(fd.get('titulo') ?? ''), dia, hora, minutos: Number(fd.get('minutos')) || 60, descricao: String(fd.get('descricao') ?? ''), local: String(fd.get('local') ?? ''), convidados }),
+                  '_blank',
+                  'noopener',
+                );
+                if (taskId) start(() => registrarAgendamento(taskId, dia, hora, fd.get('prazo') === 'on'));
+                form.current?.reset();
+                setErro(null);
+                setPronto('');
+                return;
+              }
               start(async () => {
                 const r = await novoCompromisso(fd);
                 if (r?.erro) return setErro(r.erro);
@@ -99,10 +121,16 @@ export function NovoCompromisso({
                 </Field>
               </div>
               <p className="-mt-1 text-[12px] text-muted">Deixe a hora vazia pra um compromisso de dia inteiro.</p>
-              <label className="flex items-center gap-2 text-[13.5px]">
-                <input type="checkbox" name="meet" className="size-4 accent-[var(--color-brand)]" />
-                <Video size={15} className="text-muted" /> Criar link do Google Meet
-              </label>
+              {modo === 'api' ? (
+                <label className="flex items-center gap-2 text-[13.5px]">
+                  <input type="checkbox" name="meet" className="size-4 accent-[var(--color-brand)]" />
+                  <Video size={15} className="text-muted" /> Criar link do Google Meet
+                </label>
+              ) : (
+                <p className="flex items-center gap-2 text-[12.5px] text-muted">
+                  <Video size={15} /> Quer Meet? No Google, clique em &quot;Adicionar videoconferência do Google Meet&quot; antes de salvar.
+                </p>
+              )}
               <Field label="Convidados (e-mails separados por vírgula)">
                 <input name="convidados" placeholder="cliente@empresa.com" className="field" />
               </Field>
@@ -125,7 +153,7 @@ export function NovoCompromisso({
                 Cancelar
               </button>
               <button className={btn.primary} disabled={pending}>
-                {pending ? 'Salvando…' : 'Salvar na agenda'}
+                {pending ? 'Salvando…' : modo === 'link' ? 'Abrir no Google Agenda' : 'Salvar na agenda'}
               </button>
             </footer>
           </form>

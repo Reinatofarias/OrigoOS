@@ -25,9 +25,12 @@ Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
 
 ## Google Agenda (opcional)
 
+**Jeito simples (só leitura):** no Google Agenda, abra Configurações > sua agenda > Integrar agenda, copie o **Endereço secreto no formato iCal** e cadastre na Vercel como `GOOGLE_AGENDA_ICS`. A tela Agenda e o Início passam a mostrar seus compromissos (com repetições). O botão de compromisso abre o Google Agenda já preenchido pra salvar lá.
+
+**Jeito completo (lê e cria com Meet):**
 1. No Google Cloud, ative a Google Calendar API, configure a tela de permissão OAuth (Externo, **publicada em produção**, senão a conexão cai a cada 7 dias) e crie um ID do cliente OAuth do tipo Aplicativo da Web com o redirecionamento `https://SEU-SITE/api/google-agenda/callback`.
 2. Na Vercel, cadastre `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` e faça um novo deploy.
-3. Em Configurações > Integrações, clique em **Conectar Google Agenda**. O acesso fica guardado no banco, criptografado com o `ORIGO_SESSION_SECRET` (trocar esse segredo exige conectar de novo), e fica fora do backup.
+3. Em Configurações > Integrações, clique em **Conectar Google Agenda**. O acesso fica guardado no banco, criptografado com o `ORIGO_SESSION_SECRET`, e fica fora do backup. Com a conta conectada, ela tem prioridade sobre o endereço iCal.
 
 ## Segurança
 

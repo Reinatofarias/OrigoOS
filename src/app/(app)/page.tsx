@@ -62,7 +62,7 @@ export default async function InicioPage() {
   const aReceber = (mes ?? []).filter((c) => c.status === 'pendente').reduce((s, c) => s + Number(c.valor), 0);
   // Agenda de hoje: só aparece com o Google Agenda conectado. Se o Google falhar, o Início segue normal.
   const agenda = await situacaoAgenda(supa).catch(() => null);
-  const eventos: Evento[] | null = agenda?.conectada ? await listarEventos(supa, hoje, hoje).catch(() => null) : null;
+  const eventos: Evento[] | null = agenda?.ve ? await listarEventos(supa, hoje, hoje).catch(() => null) : null;
   const vencido = cobrancas.filter((c) => situacao(c, hoje) === 'vencido').reduce((s, c) => s + Number(c.valor), 0);
 
   return (
@@ -122,7 +122,7 @@ export default async function InicioPage() {
           </div>
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
-            {agenda?.conectada && (
+            {agenda?.ve && (
               <Card title="Agenda de hoje" aside={<Link href="/agenda" className="font-semibold text-brand">Ver semana</Link>}>
                 {eventos === null ? (
                   <p className="text-[13px] text-danger">Não consegui ler o Google Agenda agora.</p>
@@ -132,7 +132,7 @@ export default async function InicioPage() {
                   <p className="text-[13px] text-muted">Nenhum compromisso hoje.</p>
                 )}
                 <div className="mt-3">
-                  <NovoCompromisso dia={hoje} variant="secondary" />
+                  <NovoCompromisso dia={hoje} variant="secondary" modo={agenda.conectada ? 'api' : 'link'} />
                 </div>
               </Card>
             )}
