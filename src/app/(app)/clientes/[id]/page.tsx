@@ -23,7 +23,7 @@ import { resumosDas } from '@/lib/tarefas';
 import RoutineToggle from '@/components/routine';
 import FormDialog, { Field } from '@/components/dialog';
 import ClientFields from '@/components/client-form';
-import { addCharge, aplicarOnboarding, novoRelatorio, saveClient } from '@/app/actions';
+import { addCharge, aplicarOnboarding, gerarContratoDoCliente, novoRelatorio, saveClient } from '@/app/actions';
 
 const TABS = ['geral', 'cobrancas', 'tarefas', 'relatorios', 'anuncios', 'portal', 'dados'] as const;
 
@@ -252,7 +252,14 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                       </Link>
                     ))
                   ) : (
-                    <p className="text-[13px] text-muted">O contrato é gerado sozinho quando o cliente aceita a proposta.</p>
+                    <p className="text-[13px] text-muted">Nenhum contrato ainda. Ele é gerado sozinho quando o cliente aceita a proposta, ou pelo botão abaixo.</p>
+                  )}
+                  {!contratos.some((ct) => ct.status === 'aguardando') && (
+                    <form action={gerarContratoDoCliente.bind(null, cliente.id)} className="mt-3">
+                      <button className={btn.secondary}>
+                        <FileSignature size={15} /> {contratos.some((ct) => ct.status === 'assinado') ? 'Gerar novo contrato' : 'Gerar contrato'}
+                      </button>
+                    </form>
                   )}
                 </Card>
                 {cliente.servicos?.length > 0 && (

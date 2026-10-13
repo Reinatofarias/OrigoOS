@@ -1,6 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { EMPRESA_PADRAO, type Empresa, type Proposal } from './db';
+import { EMPRESA_PADRAO, type Client, type Empresa, type ItemProposta, type Proposal } from './db';
 
 export async function lerEmpresa(supa: SupabaseClient): Promise<Empresa> {
   const { data } = await supa.from('settings').select('valor').eq('chave', 'empresa').maybeSingle();
@@ -38,6 +38,38 @@ export async function criarContrato(supa: SupabaseClient, proposalId: string) {
         email: c?.email ?? '',
         telefone: c?.telefone ?? p.leads?.whatsapp ?? '',
         representante: c?.responsavel ?? p.leads?.contato ?? '',
+      },
+    })
+    .select('id')
+    .single();
+  return (novo?.id as string) ?? null;
+}
+
+// Contrato pra quem já é cliente e não passou por proposta: usa os serviços (ou a mensalidade) do cadastro.
+export async function criarContratoDoCliente(supa: SupabaseClient, clientId: string) {
+  const { data: existe } = await supa.from('contracts').select('id').eq('client_id', clientId).eq('status', 'aguardando').limit(1).maybeSingle();
+  if (existe) return existe.id as string;
+  const { data } = await supa.from('clients').select('*').eq('id', clientId).maybeSingle();
+  if (!data) return null;
+  const c = data as Client;
+  const plataforma = c.plataforma === 'google_meta' ? 'Google e Meta Ads' : c.plataforma === 'meta' ? 'Meta Ads' : 'Google Ads';
+  const itens: ItemProposta[] = c.servicos?.length
+    ? c.servicos
+    : [{ service_id: null, nome: `Gestão de tráfego pago (${plataforma})`, descricao: null, valor: Number(c.mensalidade ?? 0), cobranca: 'mensal', plataforma: c.plataforma }];
+  const { data: novo } = await supa
+    .from('contracts')
+    .insert({
+      client_id: c.id,
+      itens,
+      desconto: 0,
+      dia_vencimento: c.dia_vencimento ?? 10,
+      contratante: {
+        nome: c.nome,
+        documento: c.documento ?? '',
+        endereco: c.endereco ?? '',
+        email: c.email ?? '',
+        telefone: c.telefone ?? '',
+        representante: c.responsavel ?? '',
       },
     })
     .select('id')

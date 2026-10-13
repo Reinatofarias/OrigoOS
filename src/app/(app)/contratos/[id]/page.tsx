@@ -14,9 +14,9 @@ import { CancelarContrato } from './cancelar';
 export default async function ContratoPage({ params }: PageProps<'/contratos/[id]'>) {
   const { id } = await params;
   const supa = db();
-  const { data } = await supa.from('contracts').select('*, leads(id, nome, whatsapp, contato)').eq('id', id).maybeSingle();
+  const { data } = await supa.from('contracts').select('*, leads(id, nome, whatsapp, contato), clients(id, nome)').eq('id', id).maybeSingle();
   if (!data) notFound();
-  const c = data as Contract & { leads: { id: string; nome: string; whatsapp: string | null; contato: string | null } | null };
+  const c = data as Contract & { leads: { id: string; nome: string; whatsapp: string | null; contato: string | null } | null; clients: { id: string; nome: string } | null };
   let empresa: Empresa;
   let itens: Clausula[];
   if (c.status === 'assinado' && c.conteudo) {
@@ -35,8 +35,8 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
     <>
       <PageHeader
         trail={[
-          { href: '/comercial', label: 'Comercial' },
-          ...(c.leads ? [{ href: `/comercial/${c.leads.id}`, label: c.leads.nome }] : []),
+          { href: '/contratos', label: 'Contratos' },
+          ...(c.clients ? [{ href: `/clientes/${c.clients.id}`, label: c.clients.nome }] : c.leads ? [{ href: `/comercial/${c.leads.id}`, label: c.leads.nome }] : []),
         ]}
         title={
           <span className="flex flex-wrap items-center gap-2">

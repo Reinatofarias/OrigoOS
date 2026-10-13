@@ -11,6 +11,7 @@ Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
 - **Agenda** (`/agenda`): semana com os compromissos do Google Agenda e as tarefas com prazo. Cria compromisso com link do Meet, mostra a agenda de hoje no Início e agenda direto da tarefa.
 - **Comercial** (`/comercial`): funil no estilo Pipedrive, com quadro arrastável, lista e perdidos. Cada negócio (`/comercial/[id]`) tem barra de etapas, mensagens M1 a M4 com WhatsApp, anotações, Ganho/Perdido e "Transformar em cliente".
 - **Clientes** (`/clientes`): carteira no estilo Asaas, com receita recorrente, recebido, a receber e vencido. Cada cliente (`/clientes/[id]`) tem visão geral, cobranças, tarefas e dados cadastrais.
+- **Contratos** (`/contratos`): todos os contratos com status, o passo a passo até a assinatura e "Gerar contrato" pra quem já é cliente (também na ficha do cliente).
 - **Financeiro** (`/financeiro`): mês a mês, com mensalidades geradas automaticamente, baixa de pagamento, despesas e resultado.
 
 ## Instalação
