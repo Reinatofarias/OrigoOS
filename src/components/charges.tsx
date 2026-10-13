@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, RotateCcw, Trash2, Ban, Send, ExternalLink } from 'lucide-react';
+import { CheckCircle2, RotateCcw, Trash2, Ban, Send, ExternalLink, Wallet } from 'lucide-react';
 import { deleteCharge, emitirNoAsaas, setChargeStatus } from '@/app/actions';
 import type { Charge } from '@/lib/db';
 import { FORMA, SITUACAO, brl, situacao } from '@/lib/format';
@@ -75,7 +75,7 @@ function Acoes({ c, asaas }: { c: Charge; asaas?: boolean }) {
 }
 
 export function ChargeTable({ charges, hoje, nomes, asaas }: { charges: Charge[]; hoje: string; nomes?: Record<string, string>; asaas?: boolean }) {
-  if (!charges.length) return <Empty>Nenhuma cobrança nesse período.</Empty>;
+  if (!charges.length) return <Empty icon={<Wallet size={20} strokeWidth={1.8} />}>Nenhuma cobrança nesse período.</Empty>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[780px] text-left text-[13px]">

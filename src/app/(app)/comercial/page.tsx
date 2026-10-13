@@ -4,7 +4,7 @@ import { today, prazo } from '@/lib/dates';
 import { brl } from '@/lib/format';
 import { COLUNAS, NICHO, etapaDe, formatWhatsapp } from '@/lib/prospeccao';
 import { Badge, Body, Card, Empty, Kpi, PageHeader, Tabs, btn } from '@/components/ui';
-import { FileSignature } from 'lucide-react';
+import { FileSignature, KanbanSquare } from 'lucide-react';
 import Kanban from '@/components/kanban';
 import FormDialog, { Field } from '@/components/dialog';
 import { addLead } from '@/app/actions';
@@ -98,7 +98,7 @@ export default async function ComercialPage({ searchParams }: PageProps<'/comerc
 }
 
 function LeadTable({ leads, hoje }: { leads: Lead[]; hoje: string }) {
-  if (!leads.length) return <Empty>Nenhum negócio aqui.</Empty>;
+  if (!leads.length) return <Empty icon={<KanbanSquare size={20} strokeWidth={1.8} />}>Nenhum negócio aqui.</Empty>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-left text-[13px]">

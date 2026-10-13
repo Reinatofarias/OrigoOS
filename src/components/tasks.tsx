@@ -2,10 +2,11 @@
 
 import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { CalendarDays, Circle, CircleCheck, CircleDot, Flag, Plus, Trash2, ChevronDown, X, ListChecks, MessageSquare, PanelRightOpen } from 'lucide-react';
+import { CalendarDays, Circle, CircleCheck, CircleDot, Flag, Plus, Trash2, ChevronDown, X, ListChecks, MessageSquare, PanelRightOpen, PartyPopper } from 'lucide-react';
 import { addTask, deleteTask, updateTask } from '@/app/actions';
 import type { Prioridade, Task, TaskStatus } from '@/lib/db';
 import { prazo } from '@/lib/dates';
+import { Empty } from './ui';
 import { PRIORIDADE, STATUS, type ResumoTarefa } from '@/lib/tarefas';
 
 export type ClienteMin = { id: string; nome: string };
@@ -14,11 +15,13 @@ export { STATUS, PRIORIDADE };
 
 const PROXIMO: Record<TaskStatus, TaskStatus> = { todo: 'doing', doing: 'done', done: 'todo' };
 
-const COLS = 'md:grid-cols-[28px_minmax(0,1fr)_170px_110px_110px_32px]';
+// As colunas (cliente, prazo, prioridade) aparecem quando a lista tem espaço (≥ 672px), não pelo tamanho da tela:
+// no Início a lista fica estreita e o nome da tarefa era espremido.
+const COLS = '@2xl:grid-cols-[28px_minmax(0,1fr)_170px_110px_110px_32px]';
 
 function StatusIcon({ status }: { status: TaskStatus }) {
   const cor = STATUS[status].cor;
-  if (status === 'done') return <CircleCheck size={18} color={cor} fill={cor} stroke="white" />;
+  if (status === 'done') return <CircleCheck size={18} color={cor} fill={cor} stroke="white" className="animate-pop" />;
   if (status === 'doing') return <CircleDot size={18} color={cor} />;
   return <Circle size={18} color={cor} />;
 }
@@ -106,27 +109,27 @@ export function TaskRow({
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             className={`cell-input min-w-0 flex-1 text-[13.5px] font-medium ${task.status === 'done' ? 'text-muted line-through' : ''}`}
           />
-          <span className="hidden md:flex">
+          <span className="hidden @2xl:flex">
             <Indicadores task={task} resumo={resumo} />
           </span>
           <Link
             href={`/tarefas/${task.id}`}
             title="Abrir detalhes"
             aria-label="Abrir detalhes da tarefa"
-            className="grid size-7 shrink-0 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-brand md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+            className="grid size-7 shrink-0 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-brand @2xl:opacity-0 @2xl:group-hover:opacity-100 @2xl:focus:opacity-100"
           >
             <PanelRightOpen size={15} />
           </Link>
         </div>
         {/* No celular, cliente e prazo aparecem embaixo do nome */}
-        <p className="flex items-center gap-2 px-1.5 text-[11.5px] text-muted md:hidden">
+        <p className="flex items-center gap-2 px-1.5 text-[11.5px] text-muted @2xl:hidden">
           {cliente && !semCliente && <span className="truncate">{cliente.nome}</span>}
           {task.data && <span className={`shrink-0 ${atrasada ? 'font-semibold text-danger' : ''}`}>{prazo(task.data, hoje)}</span>}
           <Indicadores task={task} resumo={resumo} />
         </p>
       </div>
 
-      <div className="hidden md:block">
+      <div className="hidden @2xl:block">
         {semCliente ? (
           <span />
         ) : (
@@ -146,11 +149,11 @@ export function TaskRow({
         )}
       </div>
 
-      <div className="hidden md:block">
+      <div className="hidden @2xl:block">
         <DateCell value={task.data} hoje={hoje} feita={task.status === 'done'} onChange={(data) => salvar({ data })} />
       </div>
 
-      <div className="hidden items-center gap-1 md:flex">
+      <div className="hidden items-center gap-1 @2xl:flex">
         <Flag size={13} color={PRIORIDADE[task.prioridade].cor} fill={task.prioridade === 'baixa' ? 'none' : PRIORIDADE[task.prioridade].cor} />
         <select
           aria-label="Prioridade"
@@ -170,7 +173,7 @@ export function TaskRow({
         type="button"
         onClick={() => confirm('Apagar esta tarefa?') && start(() => deleteTask(task.id))}
         aria-label="Apagar tarefa"
-        className="grid size-7 place-items-center rounded-md text-faint opacity-100 hover:bg-danger-soft hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+        className="grid size-7 place-items-center rounded-md text-faint opacity-100 hover:bg-danger-soft hover:text-danger @2xl:opacity-0 @2xl:group-hover:opacity-100"
       >
         <Trash2 size={14} />
       </button>
@@ -275,8 +278,8 @@ export function TaskGroups({
               <span className="text-[12.5px] text-muted">{lista.length}</span>
             </button>
             {!fechado && (
-              <div className="overflow-hidden rounded-xl border border-line bg-surface">
-                <div className={`hidden border-b border-line bg-surface-2/50 px-3 py-1.5 text-[11.5px] font-medium text-muted md:grid ${COLS}`}>
+              <div className="@container overflow-hidden rounded-xl border border-line bg-surface">
+                <div className={`hidden border-b border-line bg-surface-2/50 px-3 py-1.5 text-[11.5px] font-medium text-muted @2xl:grid ${COLS}`}>
                   <span />
                   <span className="px-1.5">Nome</span>
                   <span className="px-1.5">{clientId ? '' : 'Cliente'}</span>
@@ -317,13 +320,13 @@ export function TodayTasks({
   resumos?: Record<string, ResumoTarefa>;
 }) {
   return (
-    <div>
+    <div className="@container">
       {tasks.length ? (
         tasks.map((t) => <TaskRow key={`${t.id}-${t.status}-${t.titulo}`} task={t} clientes={clientes} hoje={hoje} resumo={resumos?.[t.id]} />)
       ) : (
-        <p className="px-4 py-5 text-center text-[13px] text-muted">
+        <Empty icon={<PartyPopper size={20} strokeWidth={1.8} />}>
           Nada pendente pra hoje. <Link href="/tarefas" className="font-semibold text-brand">Ver todas as tarefas</Link>
-        </p>
+        </Empty>
       )}
       <AddRow status="todo" data={hoje} />
     </div>
