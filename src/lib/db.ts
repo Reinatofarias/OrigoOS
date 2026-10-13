@@ -1,5 +1,6 @@
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
+import type { Repeticao } from './repeticao';
 
 const VARIAVEIS = ['SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY'] as const;
 
@@ -98,6 +99,8 @@ export type Task = {
   feita_em: string | null;
   origem: 'manual' | 'onboarding' | 'recorrente';
   template_id: string | null;
+  // v10: some quando o SQL ainda não rodou.
+  repeticao?: Repeticao | null;
   created_at: string;
 };
 

@@ -18,7 +18,8 @@ import {
   verifySenhaOkToken,
 } from '@/lib/auth';
 import { codigoValido, lerSeguranca, loginTravado, nomeDoAparelho, quemPediu, registrar } from '@/lib/seguranca';
-import { db, type Charge, type Client, type Contract, type Contratante, type ItemProposta, type ModeloContrato, type Rede, type TipoContrato, type LeadStatus, type Prioridade, type Proposal, type Service, type TaskStatus, type TaskTemplate } from '@/lib/db';
+import { db, type Charge, type Client, type Contract, type Contratante, type ItemProposta, type ModeloContrato, type Rede, type TipoContrato, type LeadStatus, type Prioridade, type Proposal, type Service, type Task, type TaskStatus, type TaskTemplate } from '@/lib/db';
+import { descreverRepeticao, proximaData, type Repeticao } from '@/lib/repeticao';
 import { addDays, formatShort, monthRange, today } from '@/lib/dates';
 import { PRIORIDADE, STATUS } from '@/lib/tarefas';
 import { ESPERA, NICHO, normalizeWhatsapp, type Passo } from '@/lib/prospeccao';
@@ -127,21 +128,76 @@ export async function addTask(form: FormData) {
 
 export async function updateTask(
   id: string,
-  campos: Partial<{ titulo: string; data: string | null; client_id: string | null; prioridade: Prioridade; status: TaskStatus; descricao: string | null }>,
+  campos: Partial<{
+    titulo: string;
+    data: string | null;
+    client_id: string | null;
+    prioridade: Prioridade;
+    status: TaskStatus;
+    descricao: string | null;
+  }>,
 ) {
   await requireAuth();
   const extra =
     campos.status === undefined
       ? {}
       : { feita: campos.status === 'done', feita_em: campos.status === 'done' ? new Date().toISOString() : null };
-  const { data: antes } = await db().from('tasks').select('status, prioridade, data, client_id').eq('id', id).maybeSingle();
-  const { data: t } = await db().from('tasks').update({ ...campos, ...extra }).eq('id', id).select('titulo, client_id').maybeSingle();
+  const { data: antes } = await db().from('tasks').select('*').eq('id', id).maybeSingle<Task>();
+  // A repetição passa para a próxima tarefa; esta fica concluída sem repetição, para não gerar duas vezes.
+  const repetir = campos.status === 'done' && antes?.status !== 'done' && antes?.repeticao ? antes.repeticao : null;
+  const { data: t } = await db()
+    .from('tasks')
+    .update({ ...campos, ...extra, ...(repetir ? { repeticao: null } : {}) })
+    .eq('id', id)
+    .select('titulo, client_id')
+    .maybeSingle();
   if (antes) await registrarMudancas(id, antes, campos);
+  const proxima = antes && repetir ? await criarProxima(antes, repetir) : null;
   // Concluir feedback, reunião ou ligação com um cliente conta como contato (saúde do cliente).
   if (campos.status === 'done' && t?.client_id && CONTATO.test(t.titulo)) {
     await db().from('clients').update({ ultimo_contato: today() }).eq('id', t.client_id);
   }
   refresh();
+  // Prazo da próxima repetição, para o aviso na tela.
+  return proxima;
+}
+
+// Liga, muda ou desliga a repetição. Devolve um aviso se o banco ainda não tem a coluna (SQL v10).
+export async function definirRepeticao(id: string, repeticao: Repeticao | null): Promise<string | null> {
+  await requireAuth();
+  const { error } = await db().from('tasks').update({ repeticao }).eq('id', id);
+  if (error) return 'Falta rodar o atualizar-v10.sql no Supabase para a repetição funcionar.';
+  await db()
+    .from('task_comments')
+    .insert({ task_id: id, texto: repeticao ? `Repetição: ${descreverRepeticao(repeticao)}` : 'Repetição removida', tipo: 'atividade' });
+  refresh();
+  return null;
+}
+
+// Cria a próxima ocorrência de uma tarefa que se repete, com as subtarefas desmarcadas.
+async function criarProxima(t: Task, repeticao: Repeticao): Promise<string | null> {
+  const data = proximaData(repeticao, t.data);
+  const { data: nova } = await db()
+    .from('tasks')
+    .insert({
+      titulo: t.titulo,
+      descricao: t.descricao,
+      client_id: t.client_id,
+      prioridade: t.prioridade,
+      status: 'todo',
+      data,
+      repeticao,
+    })
+    .select('id')
+    .maybeSingle();
+  if (!nova) return null;
+  const { data: itens } = await db().from('task_items').select('titulo, ordem').eq('task_id', t.id);
+  if (itens?.length) await db().from('task_items').insert(itens.map((i) => ({ task_id: nova.id, titulo: i.titulo, ordem: i.ordem })));
+  await db().from('task_comments').insert([
+    { task_id: t.id, texto: `Repetição: próxima criada para ${formatShort(data)}`, tipo: 'atividade' },
+    { task_id: nova.id, texto: `Criada pela repetição (${descreverRepeticao(repeticao)})`, tipo: 'atividade' },
+  ]);
+  return data;
 }
 
 // Histórico da tarefa (aparece na página de detalhes). Se a tabela da v6 ainda não existir, só não grava.

@@ -439,6 +439,9 @@ select cron.schedule('origo-avisos-limpeza', '0 7 * * *', $$ delete from net._ht
 -- v9: contrato por tipo
 alter table contracts add column if not exists modelo jsonb;
 
+-- Origo OS v10: tarefas que se repetem.
+alter table tasks add column if not exists repeticao jsonb;
+
 -- Dados iniciais: os 5 clientes e os 25 leads da semana 1 (contatos levantados em 12/10/2026).
 insert into clients (nome, segmento, cidade, plataforma) values
   ('Invertech Palmas', 'Climatização', 'Palmas-TO', 'google'),
