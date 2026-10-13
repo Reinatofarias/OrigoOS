@@ -252,6 +252,9 @@ export type ModeloContrato = {
   vigencia_meses?: number;
   promo_valor?: number | null;
   promo_meses?: number | null;
+  // Contrato assinado fora do sistema (papel, Autentique...): só o registro, com a data e o link do arquivo.
+  externo?: boolean;
+  link?: string | null;
 };
 
 export type Contract = {

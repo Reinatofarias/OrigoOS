@@ -143,7 +143,7 @@ export default async function Portal({ params }: PageProps<'/portal/[token]'>) {
             <ul className="grid gap-2">
               {contratos.map((c) => (
                 <li key={c.id}>
-                  <a href={`/c/${c.token}`} className="flex items-center gap-2 text-[14px] font-semibold text-[#14152e] hover:text-[#6a4cff]">
+                  <a href={c.modelo?.externo ? (c.modelo.link ?? undefined) : `/c/${c.token}`} target={c.modelo?.externo ? '_blank' : undefined} rel="noreferrer" className="flex items-center gap-2 text-[14px] font-semibold text-[#14152e] hover:text-[#6a4cff]">
                     <FileSignature size={16} className="text-[#6a4cff]" /> Contrato Nº {numeroContrato(c.numero)}
                     <span className={`ml-auto rounded-md px-2 py-0.5 text-[12px] ${c.status === 'assinado' ? 'bg-[#e7f7ef] text-[#0f7a50]' : 'bg-[#fff4e0] text-[#a5650a]'}`}>
                       {c.status === 'assinado' ? 'Assinado' : 'Aguardando sua assinatura'}

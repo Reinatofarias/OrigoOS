@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { db, type Contract, type Empresa } from '@/lib/db';
 import { clausulas, numeroContrato, type Clausula } from '@/lib/contrato';
 import { lerEmpresa } from '@/lib/contratos';
@@ -24,6 +24,11 @@ export default async function ContratoPublico({ params, searchParams }: PageProp
   const sp = await searchParams;
   const c = await carregar(token);
   if (!c) notFound();
+  // Contrato assinado fora do sistema: aqui não tem texto, só o link do arquivo (se houver).
+  if (c.modelo?.externo) {
+    if (c.modelo.link) redirect(c.modelo.link);
+    notFound();
+  }
   // Passo 1: enquanto o cliente não manda os dados (ou pede pra corrigir), só aparece o formulário.
   const preencher = c.status === 'aguardando' && (!c.contratante.preenchido_em || sp.editar === '1');
   // Assinado: mostra exatamente o texto que foi assinado.

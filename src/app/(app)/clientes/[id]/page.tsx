@@ -24,7 +24,7 @@ import RoutineToggle from '@/components/routine';
 import FormDialog, { Field } from '@/components/dialog';
 import ClientFields from '@/components/client-form';
 import { ExcluirCliente } from '@/components/excluir-cliente';
-import { addCharge, aplicarOnboarding, novoRelatorio, saveClient } from '@/app/actions';
+import { addCharge, aplicarOnboarding, novoRelatorio, registrarContratoAssinadoFora, saveClient } from '@/app/actions';
 
 const TABS = ['geral', 'cobrancas', 'tarefas', 'relatorios', 'anuncios', 'portal', 'dados'] as const;
 
@@ -253,12 +253,26 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                       </Link>
                     ))
                   ) : (
-                    <p className="text-[13px] text-muted">Nenhum contrato ainda. Ele é gerado sozinho quando o cliente aceita a proposta, ou pelo botão abaixo.</p>
+                    <p className="text-[13px] text-muted">Nenhum contrato ainda. Gere um novo ou, se ele já assinou no papel ou em outro lugar, registre em &quot;Já assinou fora&quot;.</p>
                   )}
                   {!contratos.some((ct) => ct.status === 'aguardando') && (
-                    <Link href={`/contratos/novo?cliente=${cliente.id}`} className={`${btn.secondary} mt-3`}>
-                      <FileSignature size={15} /> {contratos.some((ct) => ct.status === 'assinado') ? 'Gerar novo contrato' : 'Gerar contrato'}
-                    </Link>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link href={`/contratos/novo?cliente=${cliente.id}`} className={btn.secondary}>
+                        <FileSignature size={15} /> {contratos.some((ct) => ct.status === 'assinado') ? 'Gerar novo contrato' : 'Gerar contrato'}
+                      </Link>
+                      {!contratos.length && (
+                        <FormDialog label="Já assinou fora" title="Contrato assinado fora do sistema" action={registrarContratoAssinadoFora} submit="Registrar" variant="secondary">
+                          <input type="hidden" name="client_id" value={cliente.id} />
+                          <p className="text-[12.5px] text-muted">Fica só o registro, sem mandar link pro cliente.</p>
+                          <Field label="Data da assinatura">
+                            <input name="assinado_em" type="date" required className="field" />
+                          </Field>
+                          <Field label="Link do contrato assinado (opcional)">
+                            <input name="link" type="url" placeholder="https://..." className="field" />
+                          </Field>
+                        </FormDialog>
+                      )}
+                    </div>
                   )}
                 </Card>
                 {cliente.servicos?.length > 0 && (

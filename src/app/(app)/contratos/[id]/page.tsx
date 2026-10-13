@@ -35,6 +35,40 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
   const { data: ss } = c.status === 'aguardando' ? await supa.from('services').select('*').eq('ativo', true).order('ordem') : { data: [] };
   const zap = (k.telefone || c.leads?.whatsapp || '').replace(/\D/g, '');
 
+  const dataBR = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Recife', dateStyle: 'long' }).format(new Date(iso));
+
+  if (modelo.externo)
+    return (
+      <>
+        <PageHeader
+          trail={[{ href: '/contratos', label: 'Contratos' }, ...(c.clients ? [{ href: `/clientes/${c.clients.id}`, label: c.clients.nome }] : [])]}
+          title={
+            <span className="flex flex-wrap items-center gap-2">
+              Contrato Nº {numeroContrato(c.numero)} <Badge tone="success">Assinado fora do sistema</Badge>
+            </span>
+          }
+          subtitle={k.nome}
+        />
+        <Body>
+          <Card title="Contrato assinado fora do sistema">
+            <div className="grid gap-3 text-[13.5px]">
+              <p>Assinado em {c.assinado_em ? dataBR(c.assinado_em) : 'data não informada'}. Aqui fica só o registro, pra o cliente não aparecer como &quot;sem contrato&quot;.</p>
+              {modelo.link ? (
+                <a href={modelo.link} target="_blank" rel="noreferrer" className={`${btn.secondary} w-fit`}>
+                  Abrir o contrato assinado
+                </a>
+              ) : (
+                <p className="text-muted">Sem link do arquivo. Se quiser, exclua e registre de novo com o link (Autentique, Google Drive...).</p>
+              )}
+              <div>
+                <ExcluirContrato id={c.id} nome={c.clients?.nome ?? k.nome ?? 'sem nome'} assinado={false} />
+              </div>
+            </div>
+          </Card>
+        </Body>
+      </>
+    );
+
   return (
     <>
       <PageHeader
