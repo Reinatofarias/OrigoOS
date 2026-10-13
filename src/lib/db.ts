@@ -101,6 +101,23 @@ export type Task = {
   created_at: string;
 };
 
+export type TaskItem = {
+  id: string;
+  task_id: string;
+  titulo: string;
+  feita: boolean;
+  ordem: number;
+  created_at: string;
+};
+
+export type TaskComment = {
+  id: string;
+  task_id: string;
+  texto: string;
+  tipo: 'comentario' | 'atividade';
+  created_at: string;
+};
+
 export type LeadStatus = 'novo' | 'm1' | 'm2' | 'm3' | 'm4' | 'respondeu' | 'call' | 'proposta' | 'fechou' | 'perdido';
 
 export type Lead = {

@@ -4,7 +4,7 @@ import { Body, Card, PageHeader } from '@/components/ui';
 
 // Diagnóstico da conexão com o Supabase: qual projeto, que tipo de chave e quantos registros cada tabela tem.
 // Não mostra a chave em si.
-const TABELAS = ['clients', 'leads', 'tasks', 'charges', 'expenses', 'services', 'proposals', 'task_templates', 'settings'];
+const TABELAS = ['clients', 'leads', 'tasks', 'charges', 'expenses', 'services', 'proposals', 'task_templates', 'task_items', 'task_comments', 'settings'];
 
 export default async function StatusPage() {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';

@@ -12,6 +12,7 @@ import { NIVEL, saudeDosClientes } from '@/lib/saude';
 import ProspeccaoHoje from '@/components/prospeccao-hoje';
 import { Badge, Body, Card, Empty, Kpi } from '@/components/ui';
 import { TodayTasks } from '@/components/tasks';
+import { resumosDas } from '@/lib/tarefas';
 import RoutineToggle from '@/components/routine';
 
 const META_DIA = 5;
@@ -43,6 +44,7 @@ export default async function InicioPage() {
 
   const todas = (ts ?? []) as Task[];
   const tarefas = todas.filter((t) => t.origem !== 'recorrente' && t.status !== 'done');
+  const resumos = await resumosDas(supa, tarefas.map((t) => t.id));
   const rotina = todas.filter((t) => t.origem === 'recorrente');
   const clientes = (cs ?? []) as Client[];
   const followups = (fu ?? []) as Lead[];
@@ -94,7 +96,7 @@ export default async function InicioPage() {
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
             <Card flush title="Minhas tarefas de hoje" aside={<Link href="/tarefas" className="font-semibold text-brand">Ver todas</Link>}>
-              <TodayTasks tasks={tarefas} clientes={clientes} hoje={hoje} />
+              <TodayTasks tasks={tarefas} clientes={clientes} hoje={hoje} resumos={resumos} />
             </Card>
 
             <Card title="Prospecção de hoje" aside="13h30 às 14h30">

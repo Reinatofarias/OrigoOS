@@ -5,6 +5,7 @@ import { Body, PageHeader } from '@/components/ui';
 import { TaskGroups } from '@/components/tasks';
 import ClientFilter from './client-filter';
 import { garantirRecorrentes } from '@/lib/modelos';
+import { resumosDas } from '@/lib/tarefas';
 
 const FILTROS = [
   { key: 'todas', label: 'Todas' },
@@ -33,6 +34,7 @@ export default async function TarefasPage({ searchParams }: PageProps<'/tarefas'
   const limite = addDays(hoje, -14);
   const visiveis = lista.filter((t) => t.status !== 'done' || (t.feita_em ?? '').slice(0, 10) >= limite);
   const abertas = visiveis.filter((t) => t.status !== 'done').length;
+  const resumos = await resumosDas(supa, visiveis.map((t) => t.id));
 
   const href = (k: string) => `/tarefas?${new URLSearchParams({ ...(k !== 'todas' && { f: k }), ...(cliente && { cliente }) })}`;
 
@@ -56,7 +58,7 @@ export default async function TarefasPage({ searchParams }: PageProps<'/tarefas'
         </nav>
       </div>
       <Body>
-        <TaskGroups tasks={visiveis} clientes={clientes ?? []} hoje={hoje} clientId={cliente || undefined} ocultarConcluidas />
+        <TaskGroups tasks={visiveis} clientes={clientes ?? []} hoje={hoje} clientId={cliente || undefined} ocultarConcluidas resumos={resumos} />
       </Body>
     </>
   );

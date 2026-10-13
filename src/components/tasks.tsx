@@ -2,25 +2,15 @@
 
 import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { CalendarDays, Circle, CircleCheck, CircleDot, Flag, Plus, Trash2, ChevronDown, X } from 'lucide-react';
+import { CalendarDays, Circle, CircleCheck, CircleDot, Flag, Plus, Trash2, ChevronDown, X, ListChecks, MessageSquare, PanelRightOpen } from 'lucide-react';
 import { addTask, deleteTask, updateTask } from '@/app/actions';
 import type { Prioridade, Task, TaskStatus } from '@/lib/db';
 import { prazo } from '@/lib/dates';
+import { PRIORIDADE, STATUS, type ResumoTarefa } from '@/lib/tarefas';
 
 export type ClienteMin = { id: string; nome: string };
 
-export const STATUS: Record<TaskStatus, { label: string; cor: string }> = {
-  todo: { label: 'A fazer', cor: '#87909e' },
-  doing: { label: 'Em andamento', cor: '#5b5bff' },
-  done: { label: 'Concluído', cor: '#0f9a64' },
-};
-
-export const PRIORIDADE: Record<Prioridade, { label: string; cor: string }> = {
-  urgente: { label: 'Urgente', cor: '#dc3a40' },
-  alta: { label: 'Alta', cor: '#e0a100' },
-  normal: { label: 'Normal', cor: '#3a6bff' },
-  baixa: { label: 'Baixa', cor: '#9a9cb5' },
-};
+export { STATUS, PRIORIDADE };
 
 const PROXIMO: Record<TaskStatus, TaskStatus> = { todo: 'doing', doing: 'done', done: 'todo' };
 
@@ -73,7 +63,19 @@ function DateCell({ value, hoje, feita, onChange }: { value: string | null; hoje
   );
 }
 
-export function TaskRow({ task, clientes, hoje, semCliente }: { task: Task; clientes: ClienteMin[]; hoje: string; semCliente?: boolean }) {
+export function TaskRow({
+  task,
+  clientes,
+  hoje,
+  semCliente,
+  resumo,
+}: {
+  task: Task;
+  clientes: ClienteMin[];
+  hoje: string;
+  semCliente?: boolean;
+  resumo?: ResumoTarefa;
+}) {
   const [pending, start] = useTransition();
   const [titulo, setTitulo] = useState(task.titulo);
   const salvar = (campos: Parameters<typeof updateTask>[1]) => start(() => updateTask(task.id, campos));
@@ -95,14 +97,25 @@ export function TaskRow({ task, clientes, hoje, semCliente }: { task: Task; clie
       </button>
 
       <div className="min-w-0">
-        <input
-          aria-label="Nome da tarefa"
-          value={titulo}
-          onChange={(e) => setTitulo(e.target.value)}
-          onBlur={() => titulo.trim() && titulo !== task.titulo && salvar({ titulo: titulo.trim() })}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-          className={`cell-input w-full text-[13.5px] font-medium ${task.status === 'done' ? 'text-muted line-through' : ''}`}
-        />
+        <div className="flex items-center gap-1">
+          <input
+            aria-label="Nome da tarefa"
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            onBlur={() => titulo.trim() && titulo !== task.titulo && salvar({ titulo: titulo.trim() })}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            className={`cell-input min-w-0 flex-1 text-[13.5px] font-medium ${task.status === 'done' ? 'text-muted line-through' : ''}`}
+          />
+          <Indicadores task={task} resumo={resumo} />
+          <Link
+            href={`/tarefas/${task.id}`}
+            title="Abrir detalhes"
+            aria-label="Abrir detalhes da tarefa"
+            className="grid size-7 shrink-0 place-items-center rounded-md text-faint hover:bg-surface-2 hover:text-brand md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+          >
+            <PanelRightOpen size={15} />
+          </Link>
+        </div>
         {/* No celular, cliente e prazo aparecem embaixo do nome */}
         <p className="flex gap-2 px-1.5 text-[11.5px] text-muted md:hidden">
           {cliente && !semCliente && <span>{cliente.nome}</span>}
@@ -162,6 +175,26 @@ export function TaskRow({ task, clientes, hoje, semCliente }: { task: Task; clie
   );
 }
 
+// Descrição, subtarefas e comentários, como os ícones do ClickUp ao lado do nome.
+function Indicadores({ task, resumo }: { task: Task; resumo?: ResumoTarefa }) {
+  if (!resumo?.itens && !resumo?.comentarios && !task.descricao) return null;
+  return (
+    <Link href={`/tarefas/${task.id}`} className="flex shrink-0 items-center gap-2 px-1 text-[11.5px] text-muted hover:text-ink">
+      {!!resumo?.itens && (
+        <span className={`flex items-center gap-0.5 ${resumo.feitos === resumo.itens ? 'text-success' : ''}`} title="Subtarefas feitas">
+          <ListChecks size={13} /> {resumo.feitos}/{resumo.itens}
+        </span>
+      )}
+      {!!resumo?.comentarios && (
+        <span className="flex items-center gap-0.5" title="Comentários">
+          <MessageSquare size={12} /> {resumo.comentarios}
+        </span>
+      )}
+      {!resumo?.itens && !resumo?.comentarios && task.descricao && <span title="Tem descrição">≡</span>}
+    </Link>
+  );
+}
+
 function AddRow({ status, clientId, data }: { status: TaskStatus; clientId?: string; data?: string }) {
   const ref = useRef<HTMLFormElement>(null);
   const [aberto, setAberto] = useState(false);
@@ -209,12 +242,14 @@ export function TaskGroups({
   hoje,
   clientId,
   ocultarConcluidas,
+  resumos,
 }: {
   tasks: Task[];
   clientes: ClienteMin[];
   hoje: string;
   clientId?: string;
   ocultarConcluidas?: boolean;
+  resumos?: Record<string, ResumoTarefa>;
 }) {
   const [fechados, setFechados] = useState<Record<string, boolean>>({ done: !!ocultarConcluidas });
   return (
@@ -253,6 +288,7 @@ export function TaskGroups({
                     clientes={clientes}
                     hoje={hoje}
                     semCliente={!!clientId}
+                    resumo={resumos?.[t.id]}
                   />
                 ))}
                 <AddRow status={st} clientId={clientId} />
@@ -266,11 +302,21 @@ export function TaskGroups({
 }
 
 // Lista compacta para o Início: só as tarefas abertas de hoje e atrasadas, com campo rápido.
-export function TodayTasks({ tasks, clientes, hoje }: { tasks: Task[]; clientes: ClienteMin[]; hoje: string }) {
+export function TodayTasks({
+  tasks,
+  clientes,
+  hoje,
+  resumos,
+}: {
+  tasks: Task[];
+  clientes: ClienteMin[];
+  hoje: string;
+  resumos?: Record<string, ResumoTarefa>;
+}) {
   return (
     <div>
       {tasks.length ? (
-        tasks.map((t) => <TaskRow key={`${t.id}-${t.status}-${t.titulo}`} task={t} clientes={clientes} hoje={hoje} />)
+        tasks.map((t) => <TaskRow key={`${t.id}-${t.status}-${t.titulo}`} task={t} clientes={clientes} hoje={hoje} resumo={resumos?.[t.id]} />)
       ) : (
         <p className="px-4 py-5 text-center text-[13px] text-muted">
           Nada pendente pra hoje. <Link href="/tarefas" className="font-semibold text-brand">Ver todas as tarefas</Link>

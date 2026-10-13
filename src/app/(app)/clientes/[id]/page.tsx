@@ -19,6 +19,7 @@ import { asaasConfigurado } from '@/lib/asaas';
 import { Avatar, Badge, Body, Card, Empty, Kpi, PageHeader, Tabs, btn } from '@/components/ui';
 import { ChargeTable } from '@/components/charges';
 import { TaskGroups, TaskRow } from '@/components/tasks';
+import { resumosDas } from '@/lib/tarefas';
 import RoutineToggle from '@/components/routine';
 import FormDialog, { Field } from '@/components/dialog';
 import ClientFields from '@/components/client-form';
@@ -49,6 +50,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
   const cobrancas = (ch ?? []) as Charge[];
   const tarefas = (ts ?? []) as Task[];
   const abertas = tarefas.filter((t) => t.status !== 'done');
+  const resumos = await resumosDas(supa, tab === 'tarefas' ? tarefas.map((t) => t.id) : abertas.slice(0, 6).map((t) => t.id));
   const recebido = cobrancas.filter((x) => x.status === 'pago').reduce((s, x) => s + Number(x.valor), 0);
   const emAberto = cobrancas.filter((x) => x.status === 'pendente').reduce((s, x) => s + Number(x.valor), 0);
   const vencidas = cobrancas.filter((x) => situacao(x, hoje) === 'vencido');
@@ -150,7 +152,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
                 <Card title="Tarefas abertas" aside={<a href={`${base}?tab=tarefas`} className="font-semibold text-brand">Ver todas</a>} flush>
                   {abertas.length ? (
-                    abertas.slice(0, 6).map((t) => <TaskRow key={`${t.id}-${t.status}-${t.titulo}`} task={t} clientes={todos ?? []} hoje={hoje} semCliente />)
+                    abertas.slice(0, 6).map((t) => <TaskRow key={`${t.id}-${t.status}-${t.titulo}`} task={t} clientes={todos ?? []} hoje={hoje} semCliente resumo={resumos[t.id]} />)
                   ) : (
                     <Empty>Nenhuma tarefa aberta pra esse cliente.</Empty>
                   )}
@@ -299,7 +301,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
           </Card>
         )}
 
-        {tab === 'tarefas' && <TaskGroups tasks={tarefas} clientes={todos ?? []} hoje={hoje} clientId={id} ocultarConcluidas />}
+        {tab === 'tarefas' && <TaskGroups tasks={tarefas} clientes={todos ?? []} hoje={hoje} clientId={id} ocultarConcluidas resumos={resumos} />}
 
         {tab === 'relatorios' && (
           <Card

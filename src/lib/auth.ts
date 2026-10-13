@@ -4,7 +4,18 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { SESSION_COOKIE, versaoValida, verifySessionToken } from './sessao';
 
-export { APARELHO_COOKIE, SESSION_COOKIE, SESSION_MAX_AGE, checkPassword, createSessionToken, isLoginConfigured } from './sessao';
+export {
+  APARELHO_COOKIE,
+  SENHA_OK_COOKIE,
+  SENHA_OK_MAX_AGE,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE,
+  checkPassword,
+  createSenhaOkToken,
+  createSessionToken,
+  isLoginConfigured,
+  verifySenhaOkToken,
+} from './sessao';
 
 export const isAuthenticated = cache(async () => {
   const store = await cookies();
