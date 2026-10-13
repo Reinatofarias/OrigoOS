@@ -1,9 +1,11 @@
 'use client';
 
-import { useActionState } from 'react';
-import { PenLine } from 'lucide-react';
-import { assinarContrato } from '@/app/actions';
+import { useState, useTransition } from 'react';
+import Link from 'next/link';
+import { ArrowRight, PenLine } from 'lucide-react';
+import { assinarContrato, enviarDadosContrato } from '@/app/actions';
 import type { Contratante } from '@/lib/db';
+import { temEmpresa } from '@/lib/contrato';
 
 const campo = 'w-full rounded-xl border border-[#d9dbe8] bg-white px-3.5 py-2.5 text-[14px] text-[#14152e] outline-none focus:border-[#6a4cff]';
 
@@ -16,46 +18,151 @@ function F({ label, children, largo }: { label: string; children: React.ReactNod
   );
 }
 
-export default function AssinarForm({ token, contratante }: { token: string; contratante: Contratante }) {
-  const [state, action, pending] = useActionState(assinarContrato.bind(null, token), null);
-  // Se der erro, o formulário volta com o que a pessoa já tinha digitado.
-  const k = state?.valores ?? contratante;
+type Dados = {
+  representante: string;
+  representante_cpf: string;
+  nacionalidade: string;
+  profissao: string;
+  representante_endereco: string;
+  email: string;
+  telefone: string;
+  empresa_nome: string;
+  empresa_cnpj: string;
+  empresa_endereco: string;
+};
+
+// Passo 1 do link: só o formulário. Depois de enviar, o cliente vê o contrato com os dados dele e assina.
+export function DadosForm({ token, contratante: k }: { token: string; contratante: Contratante }) {
+  const comEmpresa0 = temEmpresa(k) || (!!k.nome && !k.representante);
+  const [comEmpresa, setComEmpresa] = useState(comEmpresa0);
+  const [d, setD] = useState<Dados>({
+    representante: k.representante ?? '',
+    representante_cpf: k.representante_cpf ?? '',
+    nacionalidade: k.nacionalidade || 'brasileiro(a)',
+    profissao: k.profissao ?? '',
+    representante_endereco: k.representante_endereco ?? (comEmpresa0 ? '' : (k.endereco ?? '')),
+    email: k.email ?? '',
+    telefone: k.telefone ?? '',
+    empresa_nome: comEmpresa0 ? (k.nome ?? '') : '',
+    empresa_cnpj: (k.documento ?? '').replace(/\D/g, '').length === 14 ? (k.documento ?? '') : '',
+    empresa_endereco: comEmpresa0 ? (k.endereco ?? '') : '',
+  });
+  const [erro, setErro] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const set = (n: keyof Dados) => (e: React.ChangeEvent<HTMLInputElement>) => setD((x) => ({ ...x, [n]: e.target.value }));
+
   return (
-    <form key={state?.tentativa ?? 0} action={action} className="grid gap-4 rounded-2xl border border-[#e5e7f0] bg-white p-6 text-[#14152e] shadow-xl">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        setErro(null);
+        start(async () => {
+          const r = await enviarDadosContrato(token, fd);
+          if (r?.erro) setErro(r.erro);
+        });
+      }}
+      className="mx-auto grid w-full max-w-[720px] gap-4 rounded-2xl border border-[#e5e7f0] bg-white p-6 text-[#14152e] shadow-xl"
+    >
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#6a4cff]">Passo 1 de 2</p>
+          <h2 className="text-[18px] font-bold">Seus dados para o contrato</h2>
+          <p className="text-[13px] text-[#6b6e8a]">Preencha e envie. Na próxima tela você confere o contrato já com seus dados e assina.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <F label="Nome completo *">
+            <input name="representante" required autoComplete="name" value={d.representante} onChange={set('representante')} className={campo} />
+          </F>
+          <F label="CPF *">
+            <input name="representante_cpf" required inputMode="numeric" value={d.representante_cpf} onChange={set('representante_cpf')} className={campo} />
+          </F>
+          <F label="Nacionalidade">
+            <input name="nacionalidade" value={d.nacionalidade} onChange={set('nacionalidade')} className={campo} />
+          </F>
+          <F label="Profissão">
+            <input name="profissao" value={d.profissao} onChange={set('profissao')} className={campo} />
+          </F>
+          <F label="Endereço residencial completo (rua, nº, bairro, cidade/UF, CEP) *" largo>
+            <input name="representante_endereco" required autoComplete="street-address" value={d.representante_endereco} onChange={set('representante_endereco')} className={campo} />
+          </F>
+          <F label="E-mail *">
+            <input name="email" type="email" required autoComplete="email" value={d.email} onChange={set('email')} className={campo} />
+          </F>
+          <F label="WhatsApp *">
+            <input name="telefone" required inputMode="tel" autoComplete="tel" value={d.telefone} onChange={set('telefone')} className={campo} />
+          </F>
+        </div>
+
+        <fieldset className="grid gap-3">
+          <legend className="mb-2 text-[13.5px] font-semibold">O contrato é pra uma empresa ou estabelecimento?</legend>
+          <div className="flex flex-wrap gap-2">
+            {[
+              [true, 'Sim, tenho empresa'],
+              [false, 'Não, é pra mim (pessoa física)'],
+            ].map(([v, l]) => (
+              <label key={String(v)} className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-[13px] font-medium ${comEmpresa === v ? 'border-[#6a4cff] bg-[#6a4cff] text-white' : 'border-[#d9dbe8]'}`}>
+                <input type="radio" name="tem_empresa" checked={comEmpresa === v} onChange={() => setComEmpresa(v as boolean)} className="sr-only" />
+                {l as string}
+              </label>
+            ))}
+          </div>
+          {comEmpresa && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <F label="Nome da empresa ou estabelecimento *">
+                <input name="empresa_nome" required value={d.empresa_nome} onChange={set('empresa_nome')} className={campo} />
+              </F>
+              <F label="CNPJ (se tiver)">
+                <input name="empresa_cnpj" inputMode="numeric" value={d.empresa_cnpj} onChange={set('empresa_cnpj')} className={campo} />
+              </F>
+              <F label="Endereço da empresa *" largo>
+                <input name="empresa_endereco" required value={d.empresa_endereco} onChange={set('empresa_endereco')} className={campo} />
+              </F>
+            </div>
+          )}
+        </fieldset>
+        {erro && <p className="rounded-lg bg-[#fde8e9] px-3 py-2 text-[13px] text-[#c62f35]">{erro}</p>}
+        <div>
+          <button disabled={pending} className="bg-grad inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-semibold text-white shadow-lg disabled:opacity-60">
+            {pending ? 'Enviando…' : 'Enviar e ver o contrato'} <ArrowRight size={16} />
+          </button>
+        </div>
+    </form>
+  );
+}
+
+// Passo 2: o contrato já está na tela com os dados do cliente; aqui ele confirma e assina.
+export function AssinarBotao({ token }: { token: string }) {
+  const [erro, setErro] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        setErro(null);
+        start(async () => {
+          const r = await assinarContrato(token, fd);
+          if (r?.erro) setErro(r.erro);
+        });
+      }}
+      className="mx-auto grid w-full max-w-[820px] gap-4 rounded-2xl border border-[#e5e7f0] bg-white p-6 text-[#14152e] shadow-xl"
+    >
       <div>
-        <h2 className="text-[17px] font-bold">Assinar o contrato</h2>
-        <p className="text-[13px] text-[#6b6e8a]">Confira e complete os dados. Eles entram no contrato assinado.</p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <F label="Empresa ou nome do contratante *">
-          <input name="nome" required defaultValue={k.nome} className={campo} />
-        </F>
-        <F label="CNPJ ou CPF do contratante *">
-          <input name="documento" required inputMode="numeric" defaultValue={k.documento} className={campo} />
-        </F>
-        <F label="Endereço completo *" largo>
-          <input name="endereco" required defaultValue={k.endereco} className={campo} />
-        </F>
-        <F label="E-mail">
-          <input name="email" type="email" defaultValue={k.email} className={campo} />
-        </F>
-        <F label="Nome de quem assina *">
-          <input name="representante" required defaultValue={k.representante} className={campo} />
-        </F>
-        <F label="CPF de quem assina *">
-          <input name="representante_cpf" required inputMode="numeric" defaultValue={k.representante_cpf} className={campo} />
-        </F>
-        <input type="hidden" name="telefone" value={k.telefone ?? ''} />
+        <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#6a4cff]">Passo 2 de 2</p>
+        <h2 className="text-[18px] font-bold">Assinar o contrato</h2>
       </div>
       <label className="flex items-start gap-2.5 text-[13.5px]">
         <input type="checkbox" name="aceite" required className="mt-0.5 size-4 accent-[#6a4cff]" />
-        Li o contrato e concordo com todas as cláusulas. Sei que esta assinatura eletrônica tem validade jurídica.
+        Li o contrato acima, confirmo que meus dados estão corretos e concordo com todas as cláusulas. Sei que esta assinatura eletrônica tem validade jurídica.
       </label>
-      {state?.erro && <p className="rounded-lg bg-[#fde8e9] px-3 py-2 text-[13px] text-[#c62f35]">{state.erro}</p>}
-      <div>
+      {erro && <p className="rounded-lg bg-[#fde8e9] px-3 py-2 text-[13px] text-[#c62f35]">{erro}</p>}
+      <div className="flex flex-wrap items-center gap-3">
         <button disabled={pending} className="bg-grad inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-semibold text-white shadow-lg disabled:opacity-60">
           <PenLine size={16} /> {pending ? 'Assinando…' : 'Assinar contrato'}
         </button>
+        <Link href={`/c/${token}?editar=1`} className="text-[13.5px] font-semibold text-[#6a4cff] underline">
+          Corrigir meus dados
+        </Link>
       </div>
     </form>
   );

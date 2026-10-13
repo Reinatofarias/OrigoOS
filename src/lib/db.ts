@@ -235,6 +235,23 @@ export type Contratante = {
   telefone?: string;
   representante?: string;
   representante_cpf?: string;
+  representante_endereco?: string;
+  nacionalidade?: string;
+  profissao?: string;
+  // Quando o cliente enviou os dados pelo link (passo 1, antes de assinar).
+  preenchido_em?: string;
+};
+
+export type TipoContrato = 'trafego' | 'mentoria' | 'servicos';
+export type Rede = 'google' | 'meta' | 'tiktok' | 'youtube' | 'linkedin';
+
+// O que o Renato escolhe antes de mandar o contrato: tipo, redes, prazo e condição de entrada.
+export type ModeloContrato = {
+  tipo?: TipoContrato;
+  redes?: Rede[];
+  vigencia_meses?: number;
+  promo_valor?: number | null;
+  promo_meses?: number | null;
 };
 
 export type Contract = {
@@ -248,6 +265,7 @@ export type Contract = {
   itens: ItemProposta[];
   desconto: number;
   dia_vencimento: number;
+  modelo: ModeloContrato | null;
   status: 'aguardando' | 'assinado' | 'cancelado';
   conteudo: string | null;
   hash: string | null;
@@ -267,9 +285,11 @@ export type Empresa = {
   endereco: string;
   cidade: string;
   email: string;
+  responsavel_cpf?: string;
+  pix?: string;
 };
 
-export const EMPRESA_PADRAO: Empresa = { nome: 'Origo Company', responsavel: 'Renato Farias', documento: '', endereco: '', cidade: 'Igarassu-PE', email: '' };
+export const EMPRESA_PADRAO: Empresa = { nome: 'Origo Company', responsavel: 'Renato Farias', documento: '', endereco: '', cidade: 'Igarassu-PE', email: '', responsavel_cpf: '', pix: '' };
 
 export type Report = {
   id: string;

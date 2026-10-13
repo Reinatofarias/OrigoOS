@@ -261,8 +261,14 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                 <Field label="CNPJ (ou CPF)">
                   <input name="documento" defaultValue={empresa.documento} className="field" />
                 </Field>
-                <Field label="Responsável">
+                <Field label="Responsável (sócio administrador)">
                   <input name="responsavel" defaultValue={empresa.responsavel} className="field" />
+                </Field>
+                <Field label="CPF do responsável">
+                  <input name="responsavel_cpf" inputMode="numeric" defaultValue={empresa.responsavel_cpf} className="field" />
+                </Field>
+                <Field label="Chave Pix pra pagamento (opcional)">
+                  <input name="pix" defaultValue={empresa.pix} className="field" />
                 </Field>
                 <Field label="E-mail">
                   <input name="email" type="email" defaultValue={empresa.email} className="field" />
@@ -271,10 +277,10 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
               <Field label="Endereço completo">
                 <input name="endereco" defaultValue={empresa.endereco} className="field" />
               </Field>
-              <Field label="Cidade do foro">
+              <Field label="Cidade do foro (ex.: Igarassu/PE)">
                 <input name="cidade" defaultValue={empresa.cidade} className="field" />
               </Field>
-              <p className="text-[12.5px] text-muted">Contratos já assinados não mudam: eles guardam o texto exato do momento da assinatura.</p>
+              <p className="text-[12.5px] text-muted">Esses dados entram na cláusula das partes de todo contrato. Se a chave Pix estiver preenchida, o contrato diz que o pagamento é por Pix nessa chave; se não, pela fatura enviada. Contratos já assinados não mudam: eles guardam o texto exato do momento da assinatura.</p>
               <div>
                 <button className={btn.primary}>Salvar</button>
               </div>

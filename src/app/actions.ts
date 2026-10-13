@@ -18,14 +18,14 @@ import {
   verifySenhaOkToken,
 } from '@/lib/auth';
 import { codigoValido, lerSeguranca, loginTravado, nomeDoAparelho, quemPediu, registrar } from '@/lib/seguranca';
-import { db, type Charge, type Client, type Contract, type Contratante, type ItemProposta, type LeadStatus, type Prioridade, type Proposal, type Service, type TaskStatus, type TaskTemplate } from '@/lib/db';
+import { db, type Charge, type Client, type Contract, type Contratante, type ItemProposta, type ModeloContrato, type Rede, type TipoContrato, type LeadStatus, type Prioridade, type Proposal, type Service, type TaskStatus, type TaskTemplate } from '@/lib/db';
 import { addDays, formatShort, monthRange, today } from '@/lib/dates';
 import { PRIORIDADE, STATUS } from '@/lib/tarefas';
 import { ESPERA, NICHO, normalizeWhatsapp, type Passo } from '@/lib/prospeccao';
 import { CONDICOES_PADRAO, INTRODUCAO_PADRAO, itemDoServico, plataformaDosItens, totais } from '@/lib/propostas';
 import { criarOnboarding } from '@/lib/modelos';
-import { criarContrato, criarContratoDoCliente, lerEmpresa } from '@/lib/contratos';
-import { clausulas } from '@/lib/contrato';
+import { clienteDoContrato, criarContrato, criarContratoNovo, lerEmpresa } from '@/lib/contratos';
+import { clausulas, cpfValido, REDES, TIPOS } from '@/lib/contrato';
 import { chavesPush, enviarParaTodos, resumoDoDia } from '@/lib/push';
 import { somaDoMes } from '@/lib/anuncios';
 import { AsaasErro, buscarCobranca, camposDoPagamento, emitirCobranca, garantirCliente, removerCobranca } from '@/lib/asaas';
@@ -695,27 +695,88 @@ export async function gerarContrato(proposalId: string) {
   if (id) redirect(`/contratos/${id}`);
 }
 
-export async function gerarContratoDoCliente(clientId: string) {
-  await requireAuth();
-  const id = await criarContratoDoCliente(db(), clientId);
-  refresh();
-  if (id) redirect(`/contratos/${id}`);
+// Tela "Novo contrato": o que foi marcado vira o modelo e os itens do contrato.
+async function escolhasDoForm(form: FormData) {
+  const tipo = String(form.get('tipo') ?? '') as TipoContrato;
+  if (!(tipo in TIPOS)) return { erro: 'Escolha o tipo do contrato.' };
+  const redes = form.getAll('redes').map(String).filter((r): r is Rede => r in REDES);
+  if (tipo === 'trafego' && !redes.length) return { erro: 'Marque pelo menos uma rede.' };
+  const ids = form.getAll('svc').map(String).filter(Boolean);
+  const { data } = ids.length ? await db().from('services').select('*').in('id', ids) : { data: [] };
+  const itens: ItemProposta[] = ((data ?? []) as Service[])
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((sv) => ({ ...itemDoServico(sv), valor: numero(form, `valor_${sv.id}`) ?? Number(sv.preco) }));
+  const outro = texto(form, 'outro_nome');
+  if (outro) {
+    itens.push({ service_id: null, nome: outro.slice(0, 200), descricao: null, valor: numero(form, 'outro_valor') ?? 0, cobranca: form.get('outro_cobranca') === 'unico' ? 'unico' : 'mensal', plataforma: null });
+  }
+  if (!itens.length) return { erro: 'Marque pelo menos um serviço.' };
+  const vig = numero(form, 'vigencia_meses') ?? 6;
+  const promoValor = form.get('promo') === 'on' ? numero(form, 'promo_valor') : null;
+  const promoMeses = promoValor ? numero(form, 'promo_meses') : null;
+  if (promoValor && (!promoMeses || promoMeses >= vig)) return { erro: 'A condição de entrada precisa durar menos meses que o contrato.' };
+  const modelo: ModeloContrato = { tipo, redes: tipo === 'trafego' ? redes : [], vigencia_meses: Math.min(36, Math.max(1, Math.round(vig))), promo_valor: promoValor, promo_meses: promoMeses };
+  return { itens, modelo, dia_vencimento: Math.min(28, Math.max(1, numero(form, 'dia_vencimento') ?? 10)) };
 }
 
-export async function gerarContratoPeloForm(form: FormData) {
+export async function novoContrato(form: FormData): Promise<{ erro?: string }> {
+  await requireAuth();
+  const e = await escolhasDoForm(form);
+  if ('erro' in e) return { erro: e.erro };
   const clientId = texto(form, 'client_id');
-  if (clientId) await gerarContratoDoCliente(clientId);
+  const novo = clientId === 'novo';
+  const nome = texto(form, 'novo_nome');
+  if (!clientId) return { erro: 'Escolha o cliente.' };
+  if (novo && !nome) return { erro: 'Coloque o nome do cliente novo.' };
+  const id = await criarContratoNovo(db(), { clientId: novo ? null : clientId, nome, telefone: normalizeWhatsapp(texto(form, 'novo_whatsapp') ?? '') || null, ...e });
+  if (!id) return { erro: 'Não consegui criar o contrato.' };
+  refresh();
+  redirect(`/contratos/${id}`);
 }
+
+export async function salvarEscolhasContrato(id: string, form: FormData): Promise<{ erro?: string }> {
+  await requireAuth();
+  const e = await escolhasDoForm(form);
+  if ('erro' in e) return { erro: e.erro };
+  await db().from('contracts').update({ ...e, updated_at: agora() }).eq('id', id).eq('status', 'aguardando');
+  refresh();
+  return {};
+}
+
+const soDoc = (v: string | null) => (v ?? '').replace(/[^\d./-]/g, '');
 
 function contratanteDoForm(form: FormData): Contratante {
   return {
     nome: texto(form, 'nome') ?? '',
-    documento: (texto(form, 'documento') ?? '').replace(/[^\d./-]/g, ''),
+    documento: soDoc(texto(form, 'documento')),
     endereco: texto(form, 'endereco') ?? '',
     email: texto(form, 'email') ?? '',
     telefone: texto(form, 'telefone') ?? '',
     representante: texto(form, 'representante') ?? '',
-    representante_cpf: texto(form, 'representante_cpf') ?? '',
+    representante_cpf: soDoc(texto(form, 'representante_cpf')),
+    representante_endereco: texto(form, 'representante_endereco') ?? '',
+    nacionalidade: texto(form, 'nacionalidade') ?? '',
+    profissao: texto(form, 'profissao') ?? '',
+  };
+}
+
+// Formulário do cliente no link: os dados dele e, se tiver, os da empresa.
+function contratanteDoCliente(form: FormData): Contratante {
+  const pessoa = texto(form, 'representante') ?? '';
+  const cpf = soDoc(texto(form, 'representante_cpf'));
+  const casa = texto(form, 'representante_endereco') ?? '';
+  const empresa = texto(form, 'empresa_nome');
+  return {
+    representante: pessoa,
+    representante_cpf: cpf,
+    representante_endereco: casa,
+    nacionalidade: texto(form, 'nacionalidade') ?? '',
+    profissao: texto(form, 'profissao') ?? '',
+    email: texto(form, 'email') ?? '',
+    telefone: texto(form, 'telefone') ?? '',
+    nome: empresa ?? pessoa,
+    documento: empresa ? soDoc(texto(form, 'empresa_cnpj')) : cpf,
+    endereco: empresa ? (texto(form, 'empresa_endereco') ?? '') : casa,
   };
 }
 
@@ -740,20 +801,41 @@ export async function cancelarContrato(id: string) {
 }
 
 // O cliente assina pela página pública do contrato. Guarda o texto exato, o código (hash), data, IP e navegador.
-export async function assinarContrato(token: string, _: unknown, form: FormData): Promise<{ erro?: string; valores?: Contratante; tentativa?: number }> {
-  if (!/^[a-f0-9]{32}$/.test(token)) return { erro: 'Link inválido.' };
-  const supa = db();
-  const { data } = await supa.from('contracts').select('*').eq('token', token).maybeSingle();
+async function contratoAguardando(token: string) {
+  if (!/^[a-f0-9]{32}$/.test(token)) return null;
+  const { data } = await db().from('contracts').select('*').eq('token', token).maybeSingle();
   const c = data as Contract | null;
-  if (!c || c.status !== 'aguardando') return { erro: 'Este contrato não está mais aguardando assinatura.' };
-  const k = contratanteDoForm(form);
-  const falha = (erro: string) => ({ erro, valores: k, tentativa: Date.now() });
-  const doc = (k.documento ?? '').replace(/\D/g, '');
+  return c?.status === 'aguardando' ? c : null;
+}
+
+// Passo 1 do link: o cliente manda os dados. Só depois ele vê o contrato montado e assina.
+export async function enviarDadosContrato(token: string, form: FormData): Promise<{ erro?: string }> {
+  const c = await contratoAguardando(token);
+  if (!c) return { erro: 'Este contrato não está mais aguardando assinatura.' };
+  const k = contratanteDoCliente(form);
   const cpf = (k.representante_cpf ?? '').replace(/\D/g, '');
-  if (!k.nome || !k.endereco || !k.representante) return falha('Preencha nome, endereço e quem assina.');
-  if (doc.length !== 11 && doc.length !== 14) return falha('Confira o CPF ou CNPJ do contratante.');
-  if (cpf.length !== 11) return falha('Confira o CPF de quem assina.');
-  if (form.get('aceite') !== 'on') return falha('Marque a caixa confirmando que leu e concorda.');
+  const cnpj = texto(form, 'empresa_nome') ? (k.documento ?? '').replace(/\D/g, '') : '';
+  if (!k.representante || !k.representante_endereco || !k.email || !k.telefone) return { erro: 'Preencha seu nome, endereço, e-mail e WhatsApp.' };
+  if (!cpfValido(cpf)) return { erro: 'Confira o seu CPF.' };
+  if (cnpj && cnpj.length !== 14) return { erro: 'Confira o CNPJ da empresa (14 números) ou deixe em branco.' };
+  if (texto(form, 'empresa_nome') && !k.endereco) return { erro: 'Coloque o endereço da empresa.' };
+  await db()
+    .from('contracts')
+    .update({ contratante: { ...k, preenchido_em: agora() }, updated_at: agora() })
+    .eq('id', c.id)
+    .eq('status', 'aguardando');
+  revalidatePath(`/c/${token}`);
+  redirect(`/c/${token}`);
+}
+
+// Passo 2: o cliente leu o contrato com os dados dele e assina. Guarda o texto exato, o código (hash), data, IP e navegador.
+export async function assinarContrato(token: string, form: FormData): Promise<{ erro?: string }> {
+  const supa = db();
+  const c = await contratoAguardando(token);
+  if (!c) return { erro: 'Este contrato não está mais aguardando assinatura.' };
+  const k = c.contratante;
+  if (!k.preenchido_em) return { erro: 'Preencha seus dados antes de assinar.' };
+  if (form.get('aceite') !== 'on') return { erro: 'Marque a caixa confirmando que leu e concorda.' };
 
   const empresa = await lerEmpresa(supa);
   const conteudo = JSON.stringify({ empresa, clausulas: clausulas(empresa, { ...c, contratante: k }) });
@@ -762,7 +844,6 @@ export async function assinarContrato(token: string, _: unknown, form: FormData)
   const { error } = await supa
     .from('contracts')
     .update({
-      contratante: k,
       conteudo,
       hash,
       status: 'assinado',
@@ -777,8 +858,9 @@ export async function assinarContrato(token: string, _: unknown, form: FormData)
     .eq('status', 'aguardando');
   if (error) return { erro: 'Não consegui registrar a assinatura. Tente de novo.' };
 
-  // Se já é cliente, completa o cadastro com o que ele preencheu (ajuda a emitir no Asaas).
+  // Se já é cliente, completa o cadastro com o que ele preencheu (ajuda a emitir no Asaas). Se não, vira cliente.
   const clientId = c.client_id ?? (c.lead_id ? (await supa.from('leads').select('client_id').eq('id', c.lead_id).single()).data?.client_id : null);
+  if (!clientId) await clienteDoContrato(supa, c, k);
   if (clientId) {
     const { data: cli } = await supa.from('clients').select('documento, endereco, email, responsavel').eq('id', clientId).single();
     if (cli) {
@@ -792,6 +874,11 @@ export async function assinarContrato(token: string, _: unknown, form: FormData)
         })
         .eq('id', clientId);
     }
+  }
+  try {
+    await enviarParaTodos(supa, { title: 'Contrato assinado ✍️', body: `${k.nome || k.representante} assinou o contrato Nº ${String(c.numero).padStart(4, '0')}. Falta só a cobrança.`, url: `/contratos/${c.id}`, tag: `contrato-${c.id}` });
+  } catch {
+    /* aviso é extra; a assinatura já valeu */
   }
   revalidatePath(`/c/${token}`);
   refresh();
@@ -811,6 +898,8 @@ export async function salvarEmpresa(form: FormData) {
         endereco: texto(form, 'endereco') ?? '',
         cidade: texto(form, 'cidade') ?? 'Igarassu-PE',
         email: texto(form, 'email') ?? '',
+        responsavel_cpf: texto(form, 'responsavel_cpf') ?? '',
+        pix: texto(form, 'pix') ?? '',
       },
       updated_at: agora(),
     });
