@@ -11,6 +11,7 @@ import { LinkAcoes } from '@/components/link-acoes';
 import { salvarContrato, salvarEscolhasContrato } from '@/app/actions';
 import { ContratoEscolhas } from '@/components/contrato-escolhas';
 import { CancelarContrato } from './cancelar';
+import { ExcluirContrato } from '@/components/excluir-contrato';
 
 export default async function ContratoPage({ params }: PageProps<'/contratos/[id]'>) {
   const { id } = await params;
@@ -116,7 +117,10 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
                 </details>
               </Card>
             )}
-            {c.status === 'aguardando' && <CancelarContrato id={c.id} />}
+            <div className="flex flex-wrap gap-2">
+              {c.status === 'aguardando' && <CancelarContrato id={c.id} />}
+              <ExcluirContrato id={c.id} nome={c.clients?.nome ?? k.nome ?? 'sem nome'} assinado={c.status === 'assinado'} />
+            </div>
           </div>
           <div className="min-w-0">
             <ContratoDoc c={c} empresa={empresa} itens={itens} />

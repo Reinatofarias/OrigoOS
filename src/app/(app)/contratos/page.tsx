@@ -3,6 +3,7 @@ import { FileSignature, Plus } from 'lucide-react';
 import { db, type Contract } from '@/lib/db';
 import { STATUS_CONTRATO, numeroContrato } from '@/lib/contrato';
 import { brl } from '@/lib/format';
+import { ExcluirContrato } from '@/components/excluir-contrato';
 import { Badge, Body, Card, Empty, Kpi, PageHeader, btn } from '@/components/ui';
 
 const quando = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
@@ -51,8 +52,8 @@ export default async function ContratosPage() {
                 {contratos.map((c) => {
                   const nome = c.clients?.nome ?? c.leads?.nome ?? c.contratante.nome ?? 'Sem nome';
                   return (
-                    <li key={c.id}>
-                      <Link href={`/contratos/${c.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-surface-2/60">
+                    <li key={c.id} className="flex items-center pr-2 hover:bg-surface-2/60">
+                      <Link href={`/contratos/${c.id}`} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                         <FileSignature size={16} className="shrink-0 text-brand" />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13.5px] font-semibold">{nome}</span>
@@ -63,6 +64,7 @@ export default async function ContratosPage() {
                         <span className="text-[13px] font-semibold tabular-nums">{brl(mensal(c))}/mês</span>
                         <Badge tone={STATUS_CONTRATO[c.status].tone}>{STATUS_CONTRATO[c.status].label}</Badge>
                       </Link>
+                      <ExcluirContrato id={c.id} nome={nome} assinado={c.status === 'assinado'} compacto />
                     </li>
                   );
                 })}
