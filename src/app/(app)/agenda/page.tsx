@@ -23,7 +23,7 @@ export default async function AgendaPage({ searchParams }: PageProps<'/agenda'>)
 
   const [situacao, { data: ts }] = await Promise.all([
     situacaoAgenda(supa),
-    supa.from('tasks').select('id, titulo, status, data').gte('data', inicio).lte('data', fim).order('created_at'),
+    supa.from('tasks').select('id, titulo, status, data, origem, client_id, clients(nome)').gte('data', inicio).lte('data', fim).order('created_at'),
   ]);
   let eventos: Evento[] = [];
   let erro: string | null = null;
@@ -34,7 +34,7 @@ export default async function AgendaPage({ searchParams }: PageProps<'/agenda'>)
       erro = e instanceof Error ? e.message : 'erro desconhecido';
     }
   }
-  const tarefas = (ts ?? []) as Pick<Task, 'id' | 'titulo' | 'status' | 'data'>[];
+  const tarefas = ((ts ?? []) as unknown as (Pick<Task, 'id' | 'titulo' | 'status' | 'data' | 'origem'> & { clients: { nome: string } | null })[]).map((t) => ({ ...t, cliente: t.clients?.nome ?? null }));
   const porDia = Object.fromEntries(dias.map((d) => [d, { eventos: eventos.filter((e) => diasDo(e).includes(d)), tarefas: tarefas.filter((t) => t.data === d) }]));
   const titulo = `${formatShort(inicio)} a ${formatShort(fim)}`;
 

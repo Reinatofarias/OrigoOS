@@ -18,6 +18,8 @@ import { scriptGoogle } from '@/lib/script-google';
 import { cronProtegido } from '@/lib/cron';
 import { redirecionamento, situacaoAgenda } from '@/lib/google-agenda';
 import { desconectarAgenda } from '@/app/acoes/agenda';
+import { lerPreferencias, relogio, relogioRodando } from '@/lib/avisos';
+import AvisosForm from '@/components/avisos-form';
 import { restaurarMensagens, salvarMensagens } from '@/app/acoes/prospeccao';
 import { sairDeTodos } from '@/app/acoes/seguranca';
 import { SairDeTodos } from '@/components/sair-todos';
@@ -146,6 +148,18 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
   const google = tab === 'integracoes' ? { token: await tokenGoogle(supa), ultimo: (await ler('google_ultimo')) as { em: string; dias: number; sem_cliente: string[] } | null } : null;
   const agenda = tab === 'integracoes' ? await situacaoAgenda(supa) : null;
   const avisoAgenda = typeof sp.agenda === 'string' ? AVISOS_AGENDA[sp.agenda] : undefined;
+  const avisos =
+    tab === 'app'
+      ? await (async () => {
+          const [prefs, , ultimo, tabela] = await Promise.all([
+            lerPreferencias(supa),
+            relogio(supa, origem),
+            ler('avisos_ultimo') as Promise<{ em: string } | null>,
+            supa.from('avisos_enviados').select('chave', { head: true, count: 'exact' }),
+          ]);
+          return { prefs, ultimo, semTabela: !!tabela.error, rodando: relogioRodando(ultimo) };
+        })()
+      : null;
   const noturno = tab === 'integracoes' ? ((await ler('noturno_ultimo')) as { em: string; meta?: { dias: number; erros: string[] } } | null) : null;
   const quando = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
@@ -162,7 +176,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
             { key: 'empresa', label: 'Dados da Origo', href: '/configuracoes?tab=empresa' },
             { key: 'mensagens', label: 'Mensagens e site', href: '/configuracoes?tab=mensagens' },
             { key: 'integracoes', label: 'Integrações', href: '/configuracoes?tab=integracoes' },
-            { key: 'app', label: 'App e lembrete', href: '/configuracoes?tab=app' },
+            { key: 'app', label: 'Notificações', href: '/configuracoes?tab=app' },
             { key: 'asaas', label: 'Asaas', href: '/configuracoes?tab=asaas' },
             { key: 'seguranca', label: 'Segurança', href: '/configuracoes?tab=seguranca' },
           ]}
@@ -270,12 +284,39 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
 
         {tab === 'app' && (
           <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
-            <Card title="Lembrete das 7h51">
-              <p className="mb-3 text-[13px] text-muted">
-                De segunda a sexta, às 7h51, chega uma notificação com as 3 tarefas mais importantes do dia, os contatos de prospecção e as cobranças vencendo.
-              </p>
-              <Lembrete />
-            </Card>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+              <Card title="1. Ligar neste aparelho">
+                <p className="mb-3 text-[13px] text-muted">Abra o Origo OS pelo ícone no celular e ligue aqui. Cada aparelho (celular, computador) liga uma vez.</p>
+                <Lembrete />
+              </Card>
+              {avisos && (
+                <Card title="2. O que avisar">
+                  <AvisosForm prefs={avisos.prefs} />
+                </Card>
+              )}
+            </div>
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+              {avisos && (
+                <Card title="Relógio dos avisos">
+                  <ul className="grid gap-2 text-[13.5px]">
+                    <Item ok={!avisos.semTabela}>{avisos.semTabela ? 'Falta rodar o supabase/atualizar-v8.sql' : 'Banco pronto pros avisos'}</Item>
+                    <Item ok={avisos.rodando}>
+                      {avisos.rodando ? `Funcionando: última volta às ${quando(avisos.ultimo!.em)}` : avisos.ultimo ? `Parado desde ${quando(avisos.ultimo.em)}` : 'Ainda não rodou'}
+                    </Item>
+                  </ul>
+                  {(!avisos.rodando || avisos.semTabela) && (
+                    <ol className="mt-3 grid list-decimal gap-2 pl-5 text-[13px] leading-relaxed">
+                      <li>
+                        No Supabase, abra o <strong>SQL Editor</strong>, cole o arquivo <code className="rounded bg-surface-2 px-1">supabase/atualizar-v8.sql</code> e clique em Run.
+                      </li>
+                      <li>Volte aqui em uns 5 minutos e recarregue: tem que aparecer &quot;Funcionando&quot;.</li>
+                    </ol>
+                  )}
+                  <p className="mt-3 text-[12.5px] text-muted">
+                    O próprio Supabase chama o Origo OS de 5 em 5 minutos pra ver se tem algo pra avisar. Não precisa de servidor nem de plano pago.
+                  </p>
+                </Card>
+              )}
             <Card title="Instalar no celular">
               <ol className="grid list-decimal gap-2 pl-5 text-[13.5px] leading-relaxed">
                 <li>
@@ -284,12 +325,13 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                 <li>
                   <strong>Android:</strong> abra no Chrome, toque nos três pontinhos e em &quot;Instalar app&quot;.
                 </li>
-                <li>Abra pelo ícone do Origo OS e ligue o lembrete aqui nesta tela, no próprio celular.</li>
+                <li>Abra pelo ícone do Origo OS e ligue as notificações aqui nesta tela, no próprio celular.</li>
               </ol>
               <p className="mt-3 text-[13px] text-muted">
                 Em qualquer tela, o botão <strong>+</strong> (ou a tecla N no computador) abre a captura rápida: fale ou escreva &quot;ligar pro Matheus amanhã urgente&quot; e vira tarefa.
               </p>
             </Card>
+            </div>
           </div>
         )}
 

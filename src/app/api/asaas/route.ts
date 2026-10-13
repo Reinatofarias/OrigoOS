@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { camposDoPagamento, type AsaasPayment } from '@/lib/asaas';
+import { avisarPagamento } from '@/lib/avisos';
 
 // Webhook do Asaas: quando o cliente paga (ou a cobrança vence, é estornada...), o Asaas avisa aqui
 // e a cobrança muda sozinha no Origo OS. O token configurado no Asaas precisa ser igual a ASAAS_WEBHOOK_TOKEN.
@@ -24,16 +25,19 @@ export async function POST(request: Request) {
   if (!p?.id) return Response.json({ ok: true });
 
   const supa = db();
-  let { data: ch } = await supa.from('charges').select('id').eq('asaas_id', p.id).maybeSingle();
+  let { data: ch } = await supa.from('charges').select('id, status').eq('asaas_id', p.id).maybeSingle();
   if (!ch && p.externalReference) {
-    ({ data: ch } = await supa.from('charges').select('id').eq('id', p.externalReference).maybeSingle());
+    ({ data: ch } = await supa.from('charges').select('id, status').eq('id', p.externalReference).maybeSingle());
   }
   if (!ch) return Response.json({ ok: true, ignorado: true });
 
+  const campos = camposDoPagamento(p);
   await supa
     .from('charges')
-    .update({ ...camposDoPagamento(p), asaas_id: p.id, ...(p.invoiceUrl && { asaas_url: p.invoiceUrl }) })
+    .update({ ...campos, asaas_id: p.id, ...(p.invoiceUrl && { asaas_url: p.invoiceUrl }) })
     .eq('id', ch.id);
+  // Aviso no celular quando o pagamento cai (uma vez só por cobrança).
+  if (campos.status === 'pago' && ch.status !== 'pago') await avisarPagamento(supa, ch.id).catch((e) => console.error('aviso de pagamento:', e));
   revalidatePath('/', 'layout');
   return Response.json({ ok: true });
 }
