@@ -30,8 +30,9 @@
   --grad: linear-gradient(135deg, #22c7ff 0%, #5b5bff 45%, #a23cff 72%, #e340c8 100%);
 }
 
+/* Escuro: segue o aparelho (Automático) ou a escolha feita em Configurações > Aparência (data-tema no <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema='claro']) {
     --bg: #0a0b1a;
     --surface: #121429;
     --surface-2: #191c36;
@@ -59,6 +60,39 @@
     --sidebar-hover: #14163a;
     color-scheme: dark;
   }
+}
+
+:root[data-tema='escuro'] {
+  --bg: #0a0b1a;
+  --surface: #121429;
+  --surface-2: #191c36;
+  --ink: #e8e9f6;
+  --muted: #9a9dbd;
+  --faint: #6c6f91;
+  --line: #252846;
+  --brand: #8a6cff;
+  --brand-hover: #9b80ff;
+  --brand-ink: #ffffff;
+  --brand-soft: #231d48;
+  --cyan: #4cc4ff;
+  --magenta: #ef6bd6;
+  --success: #3fcf8e;
+  --success-soft: #12301f;
+  --warn: #f0b357;
+  --warn-soft: #33281a;
+  --danger: #ff6b70;
+  --danger-soft: #3a1a20;
+  --info: #7a9bff;
+  --info-soft: #1a2448;
+  --wa: #3fbf77;
+  --sidebar: #070816;
+  --sidebar-ink: #a9abcf;
+  --sidebar-hover: #14163a;
+  color-scheme: dark;
+}
+
+:root[data-tema='claro'] {
+  color-scheme: light;
 }
 
 @theme inline {
