@@ -15,7 +15,7 @@ Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
 
 ## Instalação
 
-1. **Banco:** no Supabase, abra *SQL Editor*, cole o conteúdo de `supabase/instalar.sql` e rode. Isso cria as tabelas e cadastra os 5 clientes e os 25 leads iniciais. Quem já tinha uma versão anterior roda só os arquivos `supabase/atualizar-vN.sql` que faltam, em ordem (v2, v3, v4, v5, v6).
+1. **Banco:** no Supabase, abra *SQL Editor*, cole o conteúdo de `supabase/instalar.sql` e rode. Isso cria as tabelas e cadastra os 5 clientes e os 25 leads iniciais. Quem já tinha uma versão anterior roda só os arquivos `supabase/atualizar-vN.sql` que faltam, em ordem (v2, v3, v4, v5, v6, v8; a v7 não tem SQL).
 2. **Vercel:** importe este repositório e cadastre as variáveis de `.env.example`:
    - `SUPABASE_URL`: em Supabase > Settings > API (Project URL)
    - `SUPABASE_SECRET_KEY`: uma Secret key (sb_secret_...) em Supabase > Settings > API Keys. Nunca coloque no código. Se ela não existir, o app usa `SUPABASE_SERVICE_ROLE_KEY` (a que a integração Supabase + Vercel sincroniza).
@@ -31,6 +31,10 @@ Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
 1. No Google Cloud, ative a Google Calendar API, configure a tela de permissão OAuth (Externo, **publicada em produção**, senão a conexão cai a cada 7 dias) e crie um ID do cliente OAuth do tipo Aplicativo da Web com o redirecionamento `https://SEU-SITE/api/google-agenda/callback`.
 2. Na Vercel, cadastre `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` e faça um novo deploy.
 3. Em Configurações > Integrações, clique em **Conectar Google Agenda**. O acesso fica guardado no banco, criptografado com o `ORIGO_SESSION_SECRET`, e fica fora do backup. Com a conta conectada, ela tem prioridade sobre o endereço iCal.
+
+## Notificações no celular
+
+Em Configurações > Notificações: ligue no aparelho (com o Origo OS instalado na tela inicial) e escolha o que avisar: resumo do dia, compromissos da agenda (5 a 60 min antes), prospecção, tarefas que faltam, cobranças, pagamento recebido (Asaas) e saúde dos clientes, com horário de não incomodar. Quem dispara é um relógio de 5 em 5 minutos no próprio Supabase (pg_cron + pg_net), criado pelo `supabase/atualizar-v8.sql`; ele chama `/api/avisos` com uma senha que o sistema gera sozinho.
 
 ## Segurança
 

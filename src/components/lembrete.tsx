@@ -47,7 +47,7 @@ export default function Lembrete() {
         const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(await chavePublicaPush()) });
         await salvarInscricao(JSON.parse(JSON.stringify(sub)));
         setEstado('ligado');
-        setMsg('Pronto! Este aparelho vai receber o lembrete de segunda a sexta, às 7h51.');
+        setMsg('Pronto! Este aparelho vai receber as notificações que estiverem ligadas abaixo.');
       } catch {
         setMsg('Não consegui ligar o lembrete neste aparelho. Tente de novo.');
       }
@@ -62,13 +62,13 @@ export default function Lembrete() {
         await sub.unsubscribe();
       }
       setEstado('desligado');
-      setMsg('Lembrete desligado neste aparelho.');
+      setMsg('Notificações desligadas neste aparelho.');
     });
 
   const testar = () =>
     start(async () => {
       const r = await enviarLembreteTeste();
-      setMsg(r.enviados ? `Enviei agora pra ${r.enviados} aparelho(s). Deve chegar em alguns segundos.` : 'Nenhum aparelho com o lembrete ligado.');
+      setMsg(r.enviados ? `Enviei agora pra ${r.enviados} aparelho(s). Deve chegar em alguns segundos.` : 'Nenhum aparelho com as notificações ligadas.');
     });
 
   return (
@@ -76,7 +76,7 @@ export default function Lembrete() {
       {estado === 'carregando' && <p className="text-[13px] text-muted">Verificando este aparelho…</p>}
       {estado === 'instalar-iphone' && (
         <p className="rounded-lg bg-warn-soft px-3 py-2 text-[13px] text-warn">
-          No iPhone, o lembrete só funciona com o Origo OS instalado: toque em Compartilhar e depois em &quot;Adicionar à Tela de Início&quot;. Abra pelo ícone e volte aqui.
+          No iPhone, as notificações só funcionam com o Origo OS instalado: toque em Compartilhar e depois em &quot;Adicionar à Tela de Início&quot;. Abra pelo ícone e volte aqui.
         </p>
       )}
       {estado === 'sem-suporte' && <p className="text-[13px] text-muted">Este navegador não recebe notificações. No celular, instale o Origo OS na tela inicial.</p>}
@@ -87,7 +87,7 @@ export default function Lembrete() {
         <div className="flex flex-wrap items-center gap-2">
           {estado === 'desligado' ? (
             <button type="button" onClick={ligar} disabled={pending} className={btn.primary}>
-              <Bell size={15} /> Ligar lembrete neste aparelho
+              <Bell size={15} /> Ligar notificações neste aparelho
             </button>
           ) : (
             <>
@@ -100,7 +100,7 @@ export default function Lembrete() {
             </>
           )}
           <button type="button" onClick={testar} disabled={pending} className={btn.secondary}>
-            <Send size={14} /> Mandar o lembrete agora
+            <Send size={14} /> Mandar um teste agora
           </button>
         </div>
       )}

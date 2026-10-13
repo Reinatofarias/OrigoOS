@@ -15,7 +15,7 @@ self.addEventListener('push', (event) => {
       icon: '/brand/app-192.png',
       badge: '/brand/badge.png',
       data: { url: aviso.url },
-      tag: 'origo-lembrete',
+      tag: aviso.tag || 'origo-lembrete',
     }),
   );
 });
@@ -23,6 +23,8 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  // Link de fora (ex.: Meet) abre direto, sem tirar o Origo OS da tela.
+  if (!url.startsWith(self.location.origin)) return event.waitUntil(self.clients.openWindow(url));
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
       for (const j of janelas) {

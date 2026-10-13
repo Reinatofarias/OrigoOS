@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { addDays, today } from './dates';
 import type { Task } from './db';
 import { saudeDosClientes } from './saude';
+import { hora, listarEventos, situacaoAgenda } from './google-agenda';
 
 // Lembrete no celular (Web Push). As chaves VAPID são geradas na primeira vez e ficam guardadas no banco,
 // então não precisa configurar nada na Vercel.
@@ -20,7 +21,8 @@ export async function chavesPush(supa: SupabaseClient): Promise<Vapid> {
   return gravada!.valor as Vapid;
 }
 
-export type Aviso = { title: string; body: string; url: string };
+// tag: avisos com tags diferentes ficam todos na tela; com a mesma tag, o novo substitui o anterior.
+export type Aviso = { title: string; body: string; url: string; tag?: string };
 
 export async function enviarParaTodos(supa: SupabaseClient, aviso: Aviso) {
   const vapid = await chavesPush(supa);
@@ -61,6 +63,12 @@ export async function resumoDoDia(supa: SupabaseClient): Promise<Aviso> {
   const vencidas = (ch ?? []).filter((c) => c.vencimento < hoje).length;
   if (vencidas) extra.push(`${vencidas} cobrança${vencidas > 1 ? 's' : ''} vencida${vencidas > 1 ? 's' : ''}`);
   else if (ch?.length) extra.push(`${ch.length} cobrança${ch.length > 1 ? 's' : ''} vencendo`);
+  // Agenda do dia (se estiver ligada): quantos compromissos e o primeiro.
+  const agenda = await situacaoAgenda(supa).catch(() => null);
+  if (agenda?.ve) {
+    const evs = (await listarEventos(supa, hoje, hoje).catch(() => [])).filter((e) => !e.diaInteiro && new Date(e.fim).getTime() > Date.now());
+    if (evs.length) extra.unshift(`${evs.length} compromisso${evs.length > 1 ? 's' : ''} (${hora(evs[0].inicio)} ${evs[0].titulo})`);
+  }
   const risco = (await saudeDosClientes(supa, hoje)).filter((c) => c.nivel === 'risco');
   if (risco.length) extra.push(`${risco.length} cliente${risco.length > 1 ? 's' : ''} em risco: ${risco.map((c) => c.nome).join(', ')}`);
   const corpo = [...(tres.length ? tres : ['Nenhuma tarefa marcada pra hoje.']), ...(extra.length ? [extra.join(' · ')] : [])].join('\n');
