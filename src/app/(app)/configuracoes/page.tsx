@@ -16,6 +16,8 @@ import { lerSeguranca, nomeDoAparelho } from '@/lib/seguranca';
 import { metaConfigurado, tokenGoogle } from '@/lib/anuncios';
 import { scriptGoogle } from '@/lib/script-google';
 import { cronProtegido } from '@/lib/cron';
+import { redirecionamento, situacaoAgenda } from '@/lib/google-agenda';
+import { desconectarAgenda } from '@/app/acoes/agenda';
 import { restaurarMensagens, salvarMensagens } from '@/app/acoes/prospeccao';
 import { sairDeTodos } from '@/app/acoes/seguranca';
 import { SairDeTodos } from '@/components/sair-todos';
@@ -102,6 +104,14 @@ const EVENTOS: Record<string, { label: string; ruim?: boolean }> = {
   formulario: { label: 'Contato pelo formulário do site' },
 };
 
+const AVISOS_AGENDA: Record<string, { texto: string; ok?: boolean }> = {
+  ok: { texto: 'Google Agenda conectado.', ok: true },
+  cancelado: { texto: 'Você cancelou a permissão no Google. Nada foi conectado.' },
+  expirou: { texto: 'A conexão demorou demais ou veio de outra aba. Clique em Conectar de novo.' },
+  erro: { texto: 'O Google recusou a conexão. Confira o ID, a chave e o endereço de retorno no Google Cloud e tente de novo.' },
+  'sem-chaves': { texto: 'Faltam GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET na Vercel (e um novo deploy depois).' },
+};
+
 function Item({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <li className="flex items-start gap-2">
@@ -134,6 +144,8 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
   const acessos = tab === 'seguranca' ? ((await supa.from('access_log').select('*').order('created_at', { ascending: false }).limit(25)).data ?? []) : [];
   const backup = tab === 'seguranca' ? ((await ler('backup_ultimo')) as { em: string; arquivo: string } | null) : null;
   const google = tab === 'integracoes' ? { token: await tokenGoogle(supa), ultimo: (await ler('google_ultimo')) as { em: string; dias: number; sem_cliente: string[] } | null } : null;
+  const agenda = tab === 'integracoes' ? await situacaoAgenda(supa) : null;
+  const avisoAgenda = typeof sp.agenda === 'string' ? AVISOS_AGENDA[sp.agenda] : undefined;
   const noturno = tab === 'integracoes' ? ((await ler('noturno_ultimo')) as { em: string; meta?: { dias: number; erros: string[] } } | null) : null;
   const quando = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
@@ -149,7 +161,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
             { key: 'rotina', label: 'Tarefas recorrentes', href: '/configuracoes?tab=rotina', count: rotina.length },
             { key: 'empresa', label: 'Dados da Origo', href: '/configuracoes?tab=empresa' },
             { key: 'mensagens', label: 'Mensagens e site', href: '/configuracoes?tab=mensagens' },
-            { key: 'integracoes', label: 'Meta e Google', href: '/configuracoes?tab=integracoes' },
+            { key: 'integracoes', label: 'Integrações', href: '/configuracoes?tab=integracoes' },
             { key: 'app', label: 'App e lembrete', href: '/configuracoes?tab=app' },
             { key: 'asaas', label: 'Asaas', href: '/configuracoes?tab=asaas' },
             { key: 'seguranca', label: 'Segurança', href: '/configuracoes?tab=seguranca' },
@@ -358,6 +370,60 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
 
         {tab === 'integracoes' && google && (
           <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-2">
+            {agenda && (
+              <Card title="Google Agenda" className="lg:col-span-2">
+                {avisoAgenda && (
+                  <p className={`mb-3 rounded-lg px-3 py-2 text-[13px] ${avisoAgenda.ok ? 'bg-success-soft text-success' : 'bg-warn-soft text-warn'}`}>{avisoAgenda.texto}</p>
+                )}
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div>
+                    <ul className="grid gap-2 text-[13.5px]">
+                      <Item ok={agenda.configurada}>
+                        {agenda.configurada ? 'ID e chave do Google configurados na Vercel' : <>Faltam <code className="rounded bg-surface-2 px-1">GOOGLE_CLIENT_ID</code> e <code className="rounded bg-surface-2 px-1">GOOGLE_CLIENT_SECRET</code> na Vercel</>}
+                      </Item>
+                      <Item ok={agenda.conectada}>
+                        {agenda.conectada ? `Conectado${agenda.email ? ` como ${agenda.email}` : ''}${agenda.desde ? ` desde ${quando(agenda.desde)}` : ''}` : 'Conta Google ainda não conectada'}
+                      </Item>
+                    </ul>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {agenda.configurada && (
+                        <a href="/api/google-agenda/conectar" className={agenda.conectada ? btn.secondary : btn.primary}>
+                          {agenda.conectada ? 'Conectar outra conta' : 'Conectar Google Agenda'}
+                        </a>
+                      )}
+                      {agenda.conectada && (
+                        <form action={desconectarAgenda}>
+                          <button className={btn.secondary}>Desconectar</button>
+                        </form>
+                      )}
+                    </div>
+                    <p className="mt-3 text-[12.5px] text-muted">
+                      Com a agenda conectada, aparece a tela Agenda (semana com compromissos e tarefas), a agenda de hoje no Início e o botão &quot;Agendar no Google Agenda&quot; em cada tarefa, com link do Meet se quiser.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold">Como configurar (uma vez só)</p>
+                    <ol className="mt-2 grid list-decimal gap-2 pl-5 text-[13px] leading-relaxed">
+                      <li>
+                        Entre em <strong>console.cloud.google.com</strong> com a conta da agenda, crie um projeto (ex.: &quot;Origo OS&quot;) e, em <strong>APIs e serviços &gt; Biblioteca</strong>, ative a <strong>Google Calendar API</strong>.
+                      </li>
+                      <li>
+                        Em <strong>Tela de permissão OAuth</strong>, escolha <strong>Externo</strong>, preencha nome e e-mail e salve. Depois clique em <strong>Publicar aplicativo</strong> (status &quot;Em produção&quot;). Em teste, o Google derruba a conexão a cada 7 dias.
+                      </li>
+                      <li>
+                        Em <strong>Credenciais &gt; Criar credenciais &gt; ID do cliente OAuth</strong>, tipo <strong>Aplicativo da Web</strong>. Em &quot;URIs de redirecionamento autorizados&quot;, cole:
+                        <code className="mt-1 block break-all rounded-lg bg-surface-2 px-2.5 py-2 text-[12.5px]">{redirecionamento(origem)}</code>
+                      </li>
+                      <li>
+                        Na Vercel, crie <code className="rounded bg-surface-2 px-1">GOOGLE_CLIENT_ID</code> e <code className="rounded bg-surface-2 px-1">GOOGLE_CLIENT_SECRET</code> com o que o Google mostrar e faça um novo deploy.
+                      </li>
+                      <li>Volte aqui e clique em Conectar Google Agenda. Como o app não é verificado, o Google avisa &quot;app não verificado&quot;: clique em Avançado e depois em continuar.</li>
+                    </ol>
+                    <p className="mt-3 text-[12.5px] text-muted">O ID e a chave ficam só na Vercel; nunca mande pelo chat.</p>
+                  </div>
+                </div>
+              </Card>
+            )}
             <Card title="Meta Ads">
               <ul className="grid gap-2 text-[13.5px]">
                 <Item ok={metaConfigurado()}>Token de acesso {metaConfigurado() ? 'configurado' : 'não configurado'}</Item>

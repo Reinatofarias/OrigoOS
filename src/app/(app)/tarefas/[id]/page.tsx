@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { db, type Task, type TaskComment, type TaskItem } from '@/lib/db';
 import { prazo, today } from '@/lib/dates';
 import { Badge, Body, Card, PageHeader } from '@/components/ui';
+import { situacaoAgenda } from '@/lib/google-agenda';
+import { NovoCompromisso } from '@/components/agenda';
 import { TaskActivity, TaskChecklist, TaskDescription, TaskFields, TaskStatusButtons, TaskTitle } from '@/components/task-detail';
 
 const ORIGEM: Record<Task['origem'], string> = {
@@ -24,6 +26,7 @@ export default async function TarefaPage({ params }: PageProps<'/tarefas/[id]'>)
     supa.from('task_comments').select('*').eq('task_id', id).order('created_at'),
   ]);
   if (!data) notFound();
+  const agenda = await situacaoAgenda(supa).catch(() => null);
   const task = data as Task;
   const itens = (itensRes.data ?? []) as TaskItem[];
   const comentarios = (comentariosRes.data ?? []) as TaskComment[];
@@ -87,6 +90,18 @@ export default async function TarefaPage({ params }: PageProps<'/tarefas/[id]'>)
                 <Link href={`/clientes/${cliente.id}`} className="mt-3 block text-[13px] font-semibold text-brand">
                   Abrir {cliente.nome}
                 </Link>
+              )}
+              {agenda?.conectada && (
+                <div className="mt-3 border-t border-line pt-3">
+                  <NovoCompromisso
+                    label="Agendar no Google Agenda"
+                    variant="secondary"
+                    taskId={task.id}
+                    titulo={cliente ? `${task.titulo} · ${cliente.nome}` : task.titulo}
+                    descricao={task.descricao ?? ''}
+                    dia={task.data && task.data >= hoje ? task.data : hoje}
+                  />
+                </div>
               )}
             </Card>
           </div>

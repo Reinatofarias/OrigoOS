@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListChecks, KanbanSquare, Building2, Wallet, LogOut, Activity, Target, Settings } from 'lucide-react';
+import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, Wallet, LogOut, Activity, Target, Settings } from 'lucide-react';
 import { logout } from '@/app/actions';
 import { Logo } from './logo';
 
 const LINKS = [
   { href: '/', label: 'Início', icon: Home },
   { href: '/tarefas', label: 'Tarefas', icon: ListChecks },
+  { href: '/agenda', label: 'Agenda', icon: CalendarDays },
   { href: '/comercial', label: 'Comercial', icon: KanbanSquare },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet },
@@ -84,7 +85,7 @@ export default function Sidebar() {
         </span>
       </header>
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         aria-label="Principal"
       >
         {LINKS.map(({ href, label, icon: Icon }) => (
@@ -92,7 +93,7 @@ export default function Sidebar() {
             key={href}
             href={href}
             aria-current={ativo(path, href) ? 'page' : undefined}
-            className="flex flex-col items-center gap-0.5 py-2 text-[10.5px] font-medium text-muted aria-[current=page]:text-brand"
+            className="flex min-w-0 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-muted aria-[current=page]:text-brand"
           >
             <Icon size={20} strokeWidth={1.8} />
             {label}
