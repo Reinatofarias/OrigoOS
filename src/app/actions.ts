@@ -24,7 +24,7 @@ import { PRIORIDADE, STATUS } from '@/lib/tarefas';
 import { ESPERA, NICHO, normalizeWhatsapp, type Passo } from '@/lib/prospeccao';
 import { CONDICOES_PADRAO, INTRODUCAO_PADRAO, itemDoServico, plataformaDosItens, totais } from '@/lib/propostas';
 import { criarOnboarding } from '@/lib/modelos';
-import { criarContrato, lerEmpresa } from '@/lib/contratos';
+import { criarContrato, criarContratoDoCliente, lerEmpresa } from '@/lib/contratos';
 import { clausulas } from '@/lib/contrato';
 import { chavesPush, enviarParaTodos, resumoDoDia } from '@/lib/push';
 import { somaDoMes } from '@/lib/anuncios';
@@ -693,6 +693,18 @@ export async function gerarContrato(proposalId: string) {
   const id = await criarContrato(db(), proposalId);
   refresh();
   if (id) redirect(`/contratos/${id}`);
+}
+
+export async function gerarContratoDoCliente(clientId: string) {
+  await requireAuth();
+  const id = await criarContratoDoCliente(db(), clientId);
+  refresh();
+  if (id) redirect(`/contratos/${id}`);
+}
+
+export async function gerarContratoPeloForm(form: FormData) {
+  const clientId = texto(form, 'client_id');
+  if (clientId) await gerarContratoDoCliente(clientId);
 }
 
 function contratanteDoForm(form: FormData): Contratante {

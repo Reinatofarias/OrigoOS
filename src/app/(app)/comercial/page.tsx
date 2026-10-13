@@ -3,7 +3,8 @@ import { db, type Lead } from '@/lib/db';
 import { today, prazo } from '@/lib/dates';
 import { brl } from '@/lib/format';
 import { COLUNAS, NICHO, etapaDe, formatWhatsapp } from '@/lib/prospeccao';
-import { Badge, Body, Card, Empty, Kpi, PageHeader, Tabs } from '@/components/ui';
+import { Badge, Body, Card, Empty, Kpi, PageHeader, Tabs, btn } from '@/components/ui';
+import { FileSignature } from 'lucide-react';
 import Kanban from '@/components/kanban';
 import FormDialog, { Field } from '@/components/dialog';
 import { addLead } from '@/app/actions';
@@ -24,6 +25,9 @@ export default async function ComercialPage({ searchParams }: PageProps<'/comerc
   return (
     <>
       <PageHeader title="Comercial" subtitle="Funil de vendas da Origo">
+        <Link href="/contratos" className={btn.secondary}>
+          <FileSignature size={15} /> Contratos
+        </Link>
         <FormDialog label="Negócio" title="Novo negócio" action={addLead}>
           <Field label="Empresa ou profissional *">
             <input name="nome" required className="field" placeholder="Ex.: Clínica Sorriso" />

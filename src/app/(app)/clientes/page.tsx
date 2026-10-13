@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, FileSignature } from 'lucide-react';
 import { db, type Charge, type Client } from '@/lib/db';
 import { monthRange, today } from '@/lib/dates';
 import { brl, situacao } from '@/lib/format';
 import { PLATAFORMA } from '@/lib/rotina';
-import { Avatar, Badge, Body, Card, Empty, Kpi, PageHeader } from '@/components/ui';
+import { Avatar, Badge, Body, Card, Empty, Kpi, PageHeader, btn } from '@/components/ui';
 import FormDialog from '@/components/dialog';
 import ClientFields from '@/components/client-form';
 import { addClient } from '@/app/actions';
@@ -41,6 +41,9 @@ export default async function ClientesPage() {
   return (
     <>
       <PageHeader title="Clientes" subtitle={`${ativos.length} ativos`}>
+        <Link href="/contratos" className={btn.secondary}>
+          <FileSignature size={15} /> Contratos
+        </Link>
         <FormDialog label="Novo cliente" title="Novo cliente" action={addClient}>
           <ClientFields />
           <label className="flex items-center gap-2 text-[13px]">
