@@ -238,6 +238,8 @@ export type Contratante = {
   representante_endereco?: string;
   nacionalidade?: string;
   profissao?: string;
+  // Quando o cliente enviou os dados pelo link (passo 1, antes de assinar).
+  preenchido_em?: string;
 };
 
 export type TipoContrato = 'trafego' | 'mentoria' | 'servicos';

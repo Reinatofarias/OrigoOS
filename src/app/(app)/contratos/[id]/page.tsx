@@ -57,6 +57,11 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
                 whatsapp={zap}
                 mensagem={`${nomeCurto ? `Oi, ${nomeCurto}!` : 'Oi!'} Segue o contrato da Origo: ${link}\n\nÉ só preencher seus dados no final da página, ler o contrato e clicar em "Assinar contrato". Qualquer dúvida, me chama aqui.`}
               />
+              {c.status === 'aguardando' && (
+                <p className="mt-3 text-[12.5px] text-muted">
+                  {k.preenchido_em ? 'O cliente já enviou os dados. Falta ele assinar.' : 'O cliente ainda não preencheu os dados.'}
+                </p>
+              )}
               {!empresa.documento && c.status === 'aguardando' && (
                 <p className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] text-warn">
                   Falta o CNPJ ou CPF da Origo no contrato.{' '}

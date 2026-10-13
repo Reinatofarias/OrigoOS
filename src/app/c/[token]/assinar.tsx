@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { PenLine } from 'lucide-react';
-import { assinarContrato } from '@/app/actions';
-import type { Contract, Contratante, Empresa } from '@/lib/db';
-import { clausulas, temEmpresa } from '@/lib/contrato';
-import ContratoDoc from '@/components/contrato-doc';
+import Link from 'next/link';
+import { ArrowRight, PenLine } from 'lucide-react';
+import { assinarContrato, enviarDadosContrato } from '@/app/actions';
+import type { Contratante } from '@/lib/db';
+import { temEmpresa } from '@/lib/contrato';
 
 const campo = 'w-full rounded-xl border border-[#d9dbe8] bg-white px-3.5 py-2.5 text-[14px] text-[#14152e] outline-none focus:border-[#6a4cff]';
 
@@ -31,9 +31,8 @@ type Dados = {
   empresa_endereco: string;
 };
 
-// O cliente preenche os dados dele, vê o contrato já montado com eles e assina. Enviar o formulário é a assinatura.
-export default function AssinarContrato({ token, c, empresa }: { token: string; c: Contract; empresa: Empresa }) {
-  const k = c.contratante;
+// Passo 1 do link: só o formulário. Depois de enviar, o cliente vê o contrato com os dados dele e assina.
+export function DadosForm({ token, contratante: k }: { token: string; contratante: Contratante }) {
   const comEmpresa0 = temEmpresa(k) || (!!k.nome && !k.representante);
   const [comEmpresa, setComEmpresa] = useState(comEmpresa0);
   const [d, setD] = useState<Dados>({
@@ -52,21 +51,6 @@ export default function AssinarContrato({ token, c, empresa }: { token: string; 
   const [pending, start] = useTransition();
   const set = (n: keyof Dados) => (e: React.ChangeEvent<HTMLInputElement>) => setD((x) => ({ ...x, [n]: e.target.value }));
 
-  // Prévia: o contrato com o que a pessoa já digitou.
-  const previa: Contratante = {
-    representante: d.representante,
-    representante_cpf: d.representante_cpf,
-    representante_endereco: d.representante_endereco,
-    nacionalidade: d.nacionalidade,
-    profissao: d.profissao,
-    email: d.email,
-    telefone: d.telefone,
-    nome: comEmpresa && d.empresa_nome ? d.empresa_nome : d.representante,
-    documento: comEmpresa && d.empresa_nome ? d.empresa_cnpj : d.representante_cpf,
-    endereco: comEmpresa && d.empresa_nome ? d.empresa_endereco : d.representante_endereco,
-  };
-  const doc = { ...c, contratante: previa };
-
   return (
     <form
       onSubmit={(e) => {
@@ -74,17 +58,16 @@ export default function AssinarContrato({ token, c, empresa }: { token: string; 
         const fd = new FormData(e.currentTarget);
         setErro(null);
         start(async () => {
-          const r = await assinarContrato(token, null, fd);
+          const r = await enviarDadosContrato(token, fd);
           if (r?.erro) setErro(r.erro);
         });
       }}
-      className="grid gap-5"
+      className="mx-auto grid w-full max-w-[720px] gap-4 rounded-2xl border border-[#e5e7f0] bg-white p-6 text-[#14152e] shadow-xl"
     >
-      <section className="mx-auto grid w-full max-w-[820px] gap-4 rounded-2xl border border-[#e5e7f0] bg-white p-6 text-[#14152e] shadow-xl">
         <div>
           <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#6a4cff]">Passo 1 de 2</p>
           <h2 className="text-[18px] font-bold">Seus dados para o contrato</h2>
-          <p className="text-[13px] text-[#6b6e8a]">Eles entram no contrato logo abaixo, enquanto você digita.</p>
+          <p className="text-[13px] text-[#6b6e8a]">Preencha e envie. Na próxima tela você confere o contrato já com seus dados e assina.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <F label="Nome completo *">
@@ -137,26 +120,50 @@ export default function AssinarContrato({ token, c, empresa }: { token: string; 
             </div>
           )}
         </fieldset>
-      </section>
-
-      <ContratoDoc c={doc} empresa={empresa} itens={clausulas(empresa, doc)} />
-
-      <section className="mx-auto grid w-full max-w-[820px] gap-4 rounded-2xl border border-[#e5e7f0] bg-white p-6 text-[#14152e] shadow-xl">
-        <div>
-          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#6a4cff]">Passo 2 de 2</p>
-          <h2 className="text-[18px] font-bold">Assinar</h2>
-        </div>
-        <label className="flex items-start gap-2.5 text-[13.5px]">
-          <input type="checkbox" name="aceite" required className="mt-0.5 size-4 accent-[#6a4cff]" />
-          Li o contrato acima, confirmo que meus dados estão corretos e concordo com todas as cláusulas. Sei que esta assinatura eletrônica tem validade jurídica.
-        </label>
         {erro && <p className="rounded-lg bg-[#fde8e9] px-3 py-2 text-[13px] text-[#c62f35]">{erro}</p>}
         <div>
           <button disabled={pending} className="bg-grad inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-semibold text-white shadow-lg disabled:opacity-60">
-            <PenLine size={16} /> {pending ? 'Assinando…' : 'Assinar contrato'}
+            {pending ? 'Enviando…' : 'Enviar e ver o contrato'} <ArrowRight size={16} />
           </button>
         </div>
-      </section>
+    </form>
+  );
+}
+
+// Passo 2: o contrato já está na tela com os dados do cliente; aqui ele confirma e assina.
+export function AssinarBotao({ token }: { token: string }) {
+  const [erro, setErro] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget);
+        setErro(null);
+        start(async () => {
+          const r = await assinarContrato(token, fd);
+          if (r?.erro) setErro(r.erro);
+        });
+      }}
+      className="mx-auto grid w-full max-w-[820px] gap-4 rounded-2xl border border-[#e5e7f0] bg-white p-6 text-[#14152e] shadow-xl"
+    >
+      <div>
+        <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-[#6a4cff]">Passo 2 de 2</p>
+        <h2 className="text-[18px] font-bold">Assinar o contrato</h2>
+      </div>
+      <label className="flex items-start gap-2.5 text-[13.5px]">
+        <input type="checkbox" name="aceite" required className="mt-0.5 size-4 accent-[#6a4cff]" />
+        Li o contrato acima, confirmo que meus dados estão corretos e concordo com todas as cláusulas. Sei que esta assinatura eletrônica tem validade jurídica.
+      </label>
+      {erro && <p className="rounded-lg bg-[#fde8e9] px-3 py-2 text-[13px] text-[#c62f35]">{erro}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <button disabled={pending} className="bg-grad inline-flex items-center gap-2 rounded-xl px-5 py-3 text-[14px] font-semibold text-white shadow-lg disabled:opacity-60">
+          <PenLine size={16} /> {pending ? 'Assinando…' : 'Assinar contrato'}
+        </button>
+        <Link href={`/c/${token}?editar=1`} className="text-[13.5px] font-semibold text-[#6a4cff] underline">
+          Corrigir meus dados
+        </Link>
+      </div>
     </form>
   );
 }

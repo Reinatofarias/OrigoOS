@@ -801,21 +801,41 @@ export async function cancelarContrato(id: string) {
 }
 
 // O cliente assina pela página pública do contrato. Guarda o texto exato, o código (hash), data, IP e navegador.
-export async function assinarContrato(token: string, _: unknown, form: FormData): Promise<{ erro?: string; valores?: Contratante; tentativa?: number }> {
-  if (!/^[a-f0-9]{32}$/.test(token)) return { erro: 'Link inválido.' };
-  const supa = db();
-  const { data } = await supa.from('contracts').select('*').eq('token', token).maybeSingle();
+async function contratoAguardando(token: string) {
+  if (!/^[a-f0-9]{32}$/.test(token)) return null;
+  const { data } = await db().from('contracts').select('*').eq('token', token).maybeSingle();
   const c = data as Contract | null;
-  if (!c || c.status !== 'aguardando') return { erro: 'Este contrato não está mais aguardando assinatura.' };
+  return c?.status === 'aguardando' ? c : null;
+}
+
+// Passo 1 do link: o cliente manda os dados. Só depois ele vê o contrato montado e assina.
+export async function enviarDadosContrato(token: string, form: FormData): Promise<{ erro?: string }> {
+  const c = await contratoAguardando(token);
+  if (!c) return { erro: 'Este contrato não está mais aguardando assinatura.' };
   const k = contratanteDoCliente(form);
-  const falha = (erro: string) => ({ erro, valores: k, tentativa: Date.now() });
   const cpf = (k.representante_cpf ?? '').replace(/\D/g, '');
   const cnpj = texto(form, 'empresa_nome') ? (k.documento ?? '').replace(/\D/g, '') : '';
-  if (!k.representante || !k.representante_endereco || !k.email || !k.telefone) return falha('Preencha seu nome, endereço, e-mail e WhatsApp.');
-  if (!cpfValido(cpf)) return falha('Confira o seu CPF.');
-  if (cnpj && cnpj.length !== 14) return falha('Confira o CNPJ da empresa (14 números) ou deixe em branco.');
-  if (texto(form, 'empresa_nome') && !k.endereco) return falha('Coloque o endereço da empresa.');
-  if (form.get('aceite') !== 'on') return falha('Marque a caixa confirmando que leu e concorda.');
+  if (!k.representante || !k.representante_endereco || !k.email || !k.telefone) return { erro: 'Preencha seu nome, endereço, e-mail e WhatsApp.' };
+  if (!cpfValido(cpf)) return { erro: 'Confira o seu CPF.' };
+  if (cnpj && cnpj.length !== 14) return { erro: 'Confira o CNPJ da empresa (14 números) ou deixe em branco.' };
+  if (texto(form, 'empresa_nome') && !k.endereco) return { erro: 'Coloque o endereço da empresa.' };
+  await db()
+    .from('contracts')
+    .update({ contratante: { ...k, preenchido_em: agora() }, updated_at: agora() })
+    .eq('id', c.id)
+    .eq('status', 'aguardando');
+  revalidatePath(`/c/${token}`);
+  redirect(`/c/${token}`);
+}
+
+// Passo 2: o cliente leu o contrato com os dados dele e assina. Guarda o texto exato, o código (hash), data, IP e navegador.
+export async function assinarContrato(token: string, form: FormData): Promise<{ erro?: string }> {
+  const supa = db();
+  const c = await contratoAguardando(token);
+  if (!c) return { erro: 'Este contrato não está mais aguardando assinatura.' };
+  const k = c.contratante;
+  if (!k.preenchido_em) return { erro: 'Preencha seus dados antes de assinar.' };
+  if (form.get('aceite') !== 'on') return { erro: 'Marque a caixa confirmando que leu e concorda.' };
 
   const empresa = await lerEmpresa(supa);
   const conteudo = JSON.stringify({ empresa, clausulas: clausulas(empresa, { ...c, contratante: k }) });
@@ -824,7 +844,6 @@ export async function assinarContrato(token: string, _: unknown, form: FormData)
   const { error } = await supa
     .from('contracts')
     .update({
-      contratante: k,
       conteudo,
       hash,
       status: 'assinado',
