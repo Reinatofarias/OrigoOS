@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ExcluirCliente } from '@/components/excluir-cliente';
 import { ChevronRight, FileSignature } from 'lucide-react';
 import { db, type Charge, type Client } from '@/lib/db';
 import { monthRange, today } from '@/lib/dates';
@@ -93,9 +94,12 @@ export default async function ClientesPage() {
                       <td className="px-4 py-2.5">{c.ativo ? status(c) : <Badge>Inativo</Badge>}</td>
                       <td className="px-4 py-2.5 text-muted">{tarefas[c.id] ? `${tarefas[c.id]} abertas` : '—'}</td>
                       <td className="pr-3">
-                        <Link href={`/clientes/${c.id}`} aria-label={`Abrir ${c.nome}`} className="text-faint hover:text-ink">
-                          <ChevronRight size={16} />
-                        </Link>
+                        <span className="flex items-center justify-end gap-1">
+                          <ExcluirCliente id={c.id} nome={c.nome} compacto />
+                          <Link href={`/clientes/${c.id}`} aria-label={`Abrir ${c.nome}`} className="text-faint hover:text-ink">
+                            <ChevronRight size={16} />
+                          </Link>
+                        </span>
                       </td>
                     </tr>
                   ))}

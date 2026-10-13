@@ -1,14 +1,15 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
-import { db, type Contract, type Empresa } from '@/lib/db';
-import { STATUS_CONTRATO, clausulas, numeroContrato, type Clausula } from '@/lib/contrato';
+import { db, type Contract, type Empresa, type Service } from '@/lib/db';
+import { STATUS_CONTRATO, TIPOS, clausulas, modeloDe, numeroContrato, type Clausula } from '@/lib/contrato';
 import { lerEmpresa } from '@/lib/contratos';
 import { Badge, Body, Card, PageHeader, btn } from '@/components/ui';
 import { Field } from '@/components/dialog';
 import ContratoDoc from '@/components/contrato-doc';
 import { LinkAcoes } from '@/components/link-acoes';
-import { salvarContrato } from '@/app/actions';
+import { salvarContrato, salvarEscolhasContrato } from '@/app/actions';
+import { ContratoEscolhas } from '@/components/contrato-escolhas';
 import { CancelarContrato } from './cancelar';
 
 export default async function ContratoPage({ params }: PageProps<'/contratos/[id]'>) {
@@ -28,7 +29,9 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
   const h = await headers();
   const link = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}/c/${c.token}`;
   const k = c.contratante;
-  const nomeCurto = (k.representante ?? c.leads?.contato ?? '').split(' ')[0];
+  const nomeCurto = (k.representante || c.leads?.contato || '').split(' ')[0];
+  const modelo = modeloDe(c);
+  const { data: ss } = c.status === 'aguardando' ? await supa.from('services').select('*').eq('ativo', true).order('ordem') : { data: [] };
   const zap = (k.telefone || c.leads?.whatsapp || '').replace(/\D/g, '');
 
   return (
@@ -43,7 +46,7 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
             Contrato Nº {numeroContrato(c.numero)} <Badge tone={STATUS_CONTRATO[c.status].tone}>{STATUS_CONTRATO[c.status].label}</Badge>
           </span>
         }
-        subtitle={k.nome ? `Com ${k.nome}` : undefined}
+        subtitle={`${TIPOS[modelo.tipo].label}${k.nome ? ` · ${k.nome}` : ''}`}
       />
       <Body wide>
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
@@ -52,7 +55,7 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
               <LinkAcoes
                 link={link}
                 whatsapp={zap}
-                mensagem={`${nomeCurto ? `Oi, ${nomeCurto}!` : 'Oi!'} Segue o contrato da Origo pra assinar: ${link}\n\nÉ só conferir os dados e clicar em "Assinar contrato". Qualquer dúvida, me chama aqui.`}
+                mensagem={`${nomeCurto ? `Oi, ${nomeCurto}!` : 'Oi!'} Segue o contrato da Origo: ${link}\n\nÉ só preencher seus dados no final da página, ler o contrato e clicar em "Assinar contrato". Qualquer dúvida, me chama aqui.`}
               />
               {!empresa.documento && c.status === 'aguardando' && (
                 <p className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] text-warn">
@@ -64,9 +67,15 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
               )}
             </Card>
             {c.status === 'aguardando' && (
-              <Card title="Dados do contratante">
-                <form action={salvarContrato.bind(null, c.id)} className="grid gap-3">
-                  <p className="text-[12.5px] text-muted">O cliente confere e completa na hora de assinar. Se você já tiver, preencha aqui.</p>
+              <Card title="Tipo e serviços">
+                <ContratoEscolhas servicos={(ss ?? []) as Service[]} inicial={{ modelo, itens: c.itens, dia_vencimento: c.dia_vencimento }} acao={salvarEscolhasContrato.bind(null, c.id)} botao="Salvar mudanças" />
+              </Card>
+            )}
+            {c.status === 'aguardando' && (
+              <Card title="Dados do contratante (opcional)">
+                <details>
+                  <summary className="cursor-pointer text-[13px] text-muted">O cliente preenche no link. Abra só se quiser adiantar algum dado.</summary>
+                <form action={salvarContrato.bind(null, c.id)} className="mt-3 grid gap-3">
                   <Field label="Empresa ou nome">
                     <input name="nome" defaultValue={k.nome} className="field" />
                   </Field>
@@ -99,6 +108,7 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
                     <button className={btn.primary}>Salvar dados</button>
                   </div>
                 </form>
+                </details>
               </Card>
             )}
             {c.status === 'aguardando' && <CancelarContrato id={c.id} />}

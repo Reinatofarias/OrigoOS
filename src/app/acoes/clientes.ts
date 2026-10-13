@@ -2,10 +2,12 @@
 
 import { randomBytes } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { requireAuth } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { today } from '@/lib/dates';
 import { PEDIDOS_PADRAO } from '@/lib/pedidos';
+import { removerCobranca } from '@/lib/asaas';
 import { metaConfigurado, so, sincronizarMeta, somaDoMes } from '@/lib/anuncios';
 
 const refresh = () => revalidatePath('/', 'layout');
@@ -91,4 +93,26 @@ export async function novoLinkPortal(clientId: string) {
   await requireAuth();
   await db().from('clients').update({ portal_token: randomBytes(16).toString('hex') }).eq('id', clientId);
   refresh();
+}
+
+// Exclui o cliente de vez (ex.: um teste). Leva junto cobranças, tarefas, contratos, relatórios e números de anúncio.
+export async function excluirCliente(clientId: string, voltarPraLista: boolean) {
+  await requireAuth();
+  const supa = db();
+  // Cobrança pendente no Asaas é cancelada lá também, pra não chegar boleto de cliente apagado.
+  const { data: pendentes } = await supa.from('charges').select('asaas_id').eq('client_id', clientId).eq('status', 'pendente').not('asaas_id', 'is', null);
+  for (const ch of pendentes ?? []) {
+    try {
+      await removerCobranca(ch.asaas_id as string);
+    } catch {
+      /* já paga ou removida no Asaas */
+    }
+  }
+  await supa.from('tasks').delete().eq('client_id', clientId);
+  await supa.from('contracts').delete().eq('client_id', clientId);
+  const { error } = await supa.from('clients').delete().eq('id', clientId);
+  if (error) return { erro: `Não consegui excluir: ${error.message}` };
+  refresh();
+  if (voltarPraLista) redirect('/clientes');
+  return {};
 }

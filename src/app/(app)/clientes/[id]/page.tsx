@@ -23,7 +23,8 @@ import { resumosDas } from '@/lib/tarefas';
 import RoutineToggle from '@/components/routine';
 import FormDialog, { Field } from '@/components/dialog';
 import ClientFields from '@/components/client-form';
-import { addCharge, aplicarOnboarding, gerarContratoDoCliente, novoRelatorio, saveClient } from '@/app/actions';
+import { ExcluirCliente } from '@/components/excluir-cliente';
+import { addCharge, aplicarOnboarding, novoRelatorio, saveClient } from '@/app/actions';
 
 const TABS = ['geral', 'cobrancas', 'tarefas', 'relatorios', 'anuncios', 'portal', 'dados'] as const;
 
@@ -255,11 +256,9 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                     <p className="text-[13px] text-muted">Nenhum contrato ainda. Ele é gerado sozinho quando o cliente aceita a proposta, ou pelo botão abaixo.</p>
                   )}
                   {!contratos.some((ct) => ct.status === 'aguardando') && (
-                    <form action={gerarContratoDoCliente.bind(null, cliente.id)} className="mt-3">
-                      <button className={btn.secondary}>
-                        <FileSignature size={15} /> {contratos.some((ct) => ct.status === 'assinado') ? 'Gerar novo contrato' : 'Gerar contrato'}
-                      </button>
-                    </form>
+                    <Link href={`/contratos/novo?cliente=${cliente.id}`} className={`${btn.secondary} mt-3`}>
+                      <FileSignature size={15} /> {contratos.some((ct) => ct.status === 'assinado') ? 'Gerar novo contrato' : 'Gerar contrato'}
+                    </Link>
                   )}
                 </Card>
                 {cliente.servicos?.length > 0 && (
@@ -471,6 +470,12 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                 <button className={btn.primary}>Salvar alterações</button>
               </div>
             </form>
+          </Card>
+        )}
+        {tab === 'dados' && (
+          <Card title="Excluir cliente">
+            <p className="mb-3 text-[13px] text-muted">Pra testes ou cadastro errado. Apaga o cliente com cobranças, tarefas, contratos e relatórios. Se ele só parou, desmarque &quot;Cliente ativo&quot; acima.</p>
+            <ExcluirCliente id={id} nome={cliente.nome} />
           </Card>
         )}
       </Body>

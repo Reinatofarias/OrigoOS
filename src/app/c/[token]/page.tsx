@@ -5,7 +5,7 @@ import { clausulas, numeroContrato, type Clausula } from '@/lib/contrato';
 import { lerEmpresa } from '@/lib/contratos';
 import ContratoDoc from '@/components/contrato-doc';
 import { ImprimirBotao } from '../../p/[token]/acoes';
-import AssinarForm from './assinar';
+import AssinarContrato from './assinar';
 
 // Página pública do contrato: o cliente lê, preenche os dados e assina. Só o token do link dá acesso.
 async function carregar(token: string) {
@@ -16,7 +16,7 @@ async function carregar(token: string) {
 
 export async function generateMetadata({ params }: PageProps<'/c/[token]'>): Promise<Metadata> {
   const c = await carregar((await params).token);
-  return { title: c ? `Contrato ${numeroContrato(c.numero)} · ${c.contratante.nome ?? 'Origo'}` : 'Contrato', robots: { index: false, follow: false } };
+  return { title: c ? `Contrato ${numeroContrato(c.numero)} · ${c.contratante.nome || 'Origo'}` : 'Contrato', robots: { index: false, follow: false } };
 }
 
 export default async function ContratoPublico({ params, searchParams }: PageProps<'/c/[token]'>) {
@@ -36,9 +36,9 @@ export default async function ContratoPublico({ params, searchParams }: PageProp
 
   return (
     <main className="min-h-screen bg-[#eceef6] px-3 py-6 print:bg-white print:p-0 sm:px-6 sm:py-10">
-      <ContratoDoc c={c} empresa={empresa} itens={itens} />
+      {c.status === 'aguardando' ? <AssinarContrato token={token} c={c} empresa={empresa} /> : <ContratoDoc c={c} empresa={empresa} itens={itens} />}
       <div className="no-print mx-auto mt-5 grid w-full max-w-[820px] gap-4">
-        {c.status === 'aguardando' && <AssinarForm token={token} contratante={c.contratante} />}
+        {c.status === 'assinado' && <p className="rounded-xl bg-[#e3f6ee] px-4 py-3 text-[14px] text-[#0f7a50]">Contrato assinado. Obrigado! Você pode baixar uma cópia em PDF abaixo.</p>}
         {c.status === 'cancelado' && <p className="text-[14px] text-[#6b6e8a]">Este contrato foi cancelado.</p>}
         <div>
           <ImprimirBotao auto={sp.pdf === '1'} />

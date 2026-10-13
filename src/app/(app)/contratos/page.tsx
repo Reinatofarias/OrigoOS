@@ -3,18 +3,16 @@ import { FileSignature, Plus } from 'lucide-react';
 import { db, type Contract } from '@/lib/db';
 import { STATUS_CONTRATO, numeroContrato } from '@/lib/contrato';
 import { brl } from '@/lib/format';
-import { Badge, Body, Card, Empty, Kpi, PageHeader } from '@/components/ui';
-import FormDialog, { Field } from '@/components/dialog';
-import { gerarContratoPeloForm } from '@/app/actions';
+import { Badge, Body, Card, Empty, Kpi, PageHeader, btn } from '@/components/ui';
 
 const quando = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
 
 const PASSOS = [
-  { t: 'Proposta ou cliente', d: 'Crie a proposta no negócio (Comercial) ou, pra quem já é cliente, clique em "Gerar contrato" aqui ou na ficha do cliente.' },
-  { t: 'Contrato pronto', d: 'Quando o cliente aceita a proposta, o contrato sai sozinho, com os serviços e os dados dele. Confira e complete o que faltar.' },
-  { t: 'Enviar o link', d: 'No contrato, mande o link de assinatura pelo WhatsApp (o botão já monta a mensagem).' },
-  { t: 'Cliente assina', d: 'Ele abre o link, confere, coloca nome e CPF/CNPJ e clica em "Assinar contrato". Fica registrado data, hora e IP.' },
-  { t: 'Assinado', d: 'O status muda pra Assinado, o contrato fica travado e aparece no portal do cliente.' },
+  { t: 'Escolha', d: 'Em "Novo contrato", escolha o cliente (ou cliente novo), o tipo (tráfego, mentoria ou outros serviços), as redes e os serviços.' },
+  { t: 'Enviar o link', d: 'No contrato, mande o link pelo WhatsApp (o botão já monta a mensagem).' },
+  { t: 'Cliente preenche e assina', d: 'Ele abre o link, preenche os dados dele e da empresa, lê o contrato e clica em Assinar. Fica registrado data, hora e IP.' },
+  { t: 'Vira cliente', d: 'Se ainda não era cliente, entra em Clientes sozinho com os serviços. Você recebe um aviso no celular.' },
+  { t: 'Cobrança', d: 'Só falta emitir a cobrança na ficha do cliente.' },
 ];
 
 export default async function ContratosPage() {
@@ -33,22 +31,9 @@ export default async function ContratosPage() {
   return (
     <>
       <PageHeader title="Contratos" subtitle="Todos os contratos e o caminho até a assinatura">
-        <FormDialog label="Gerar contrato" title="Gerar contrato pra um cliente" action={gerarContratoPeloForm} submit="Gerar contrato">
-          <Field label="Cliente *">
-            <select name="client_id" required className="field" defaultValue={semContrato[0]?.id ?? ''}>
-              <option value="" disabled>
-                Escolha o cliente
-              </option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nome}
-                  {comContrato.has(c.id) ? ' (já tem contrato)' : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <p className="text-[12.5px] text-muted">O contrato sai com os serviços e a mensalidade do cadastro do cliente. Depois você confere e manda o link pra assinatura.</p>
-        </FormDialog>
+        <Link href="/contratos/novo" className={btn.primary}>
+          <Plus size={15} /> Novo contrato
+        </Link>
       </PageHeader>
       <Body>
         {error && <p className="rounded-xl bg-danger-soft p-4 text-[13px] text-danger">Não consegui ler o banco: {error.message}</p>}
@@ -83,7 +68,7 @@ export default async function ContratosPage() {
                 })}
               </ul>
             ) : (
-              <Empty>Nenhum contrato ainda. Use &quot;Gerar contrato&quot; pros clientes que você já tem.</Empty>
+              <Empty>Nenhum contrato ainda. Use &quot;Novo contrato&quot; pra criar o primeiro.</Empty>
             )}
             {semContrato.length > 0 && contratos.length > 0 && (
               <p className="border-t border-line px-4 py-3 text-[12.5px] text-muted">Sem contrato: {semContrato.map((c) => c.nome).join(', ')}.</p>
