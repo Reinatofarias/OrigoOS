@@ -9,6 +9,7 @@ import { itemDoServico, totais } from '@/lib/propostas';
 import { Field } from './dialog';
 import PropostaDoc from './proposta-doc';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 type Lead = { id: string; nome: string; contato: string | null; cidade: string | null; whatsapp: string | null } | null;
 
@@ -35,7 +36,7 @@ export default function PropostaEditor({ proposta, servicos, lead, link }: { pro
   const t = totais(itens, descontoNum);
 
   const dados = () => ({ titulo: titulo.trim() || 'Proposta comercial', introducao: introducao.trim() || null, itens, desconto: descontoNum, validade: validade || null, condicoes: condicoes.trim() || null });
-  const salvar = () => start(() => salvarProposta(proposta.id, dados()));
+  const salvar = () => start(async () => { await salvarProposta(proposta.id, dados()); avisar('Proposta salva'); });
 
   async function copiar() {
     try {

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { today } from '@/lib/dates';
 import Sidebar from '@/components/sidebar';
 import Captura from '@/components/captura';
+import { Avisos } from '@/components/toast';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   await requireAuth();
@@ -12,6 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar />
       <div className="pb-[calc(152px+env(safe-area-inset-bottom))] md:pb-24 md:pl-60">{children}</div>
       <Captura clientes={clientes ?? []} hoje={today()} />
+      <Avisos />
     </div>
   );
 }

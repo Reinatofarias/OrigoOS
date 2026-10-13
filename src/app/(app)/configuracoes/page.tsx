@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { db, type Service, type TaskTemplate } from '@/lib/db';
 import { asaasAmbiente, asaasConfigurado } from '@/lib/asaas';
 import { Body, Card, PageHeader, Tabs } from '@/components/ui';
+import { SalvarBotao } from '@/components/salvar-botao';
 import { EscolhaTema } from '@/components/tema';
 import FormDialog, { Field } from '@/components/dialog';
 import { ServiceRow, TemplateRow } from '@/components/config';
@@ -284,7 +285,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
               </Field>
               <p className="text-[12.5px] text-muted">Esses dados entram na cláusula das partes de todo contrato. Se a chave Pix estiver preenchida, o contrato diz que o pagamento é por Pix nessa chave; se não, pela fatura enviada. Contratos já assinados não mudam: eles guardam o texto exato do momento da assinatura.</p>
               <div>
-                <button className={btn.primary}>Salvar</button>
+                <SalvarBotao className={btn.primary} aviso="Alterações salvas">Salvar</SalvarBotao>
               </div>
             </form>
           </Card>
@@ -396,7 +397,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                   </Field>
                 ))}
                 <div className="flex flex-wrap gap-2">
-                  <button className={btn.primary}>Salvar mensagens</button>
+                  <SalvarBotao className={btn.primary} aviso="Mensagens salvas">Salvar mensagens</SalvarBotao>
                   <button formAction={restaurarMensagens} className={btn.ghost}>
                     Voltar pras mensagens padrão
                   </button>
@@ -489,7 +490,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                       )}
                       {agenda.conectada && (
                         <form action={desconectarAgenda}>
-                          <button className={btn.secondary}>Desconectar</button>
+                          <SalvarBotao className={btn.secondary} aviso="Desconectado">Desconectar</SalvarBotao>
                         </form>
                       )}
                     </div>

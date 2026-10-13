@@ -4,6 +4,7 @@ import { useTransition } from 'react';
 import { Trash2 } from 'lucide-react';
 import { excluirContrato } from '@/app/actions';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 export function ExcluirContrato({ id, nome, assinado, compacto }: { id: string; nome: string; assinado: boolean; compacto?: boolean }) {
   const [pending, start] = useTransition();
@@ -13,6 +14,7 @@ export function ExcluirContrato({ id, nome, assinado, compacto }: { id: string; 
     start(async () => {
       const r = await excluirContrato(id, !compacto);
       if (r?.erro) alert(r.erro);
+      else avisar('Contrato excluído');
     });
   };
   if (compacto)

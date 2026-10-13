@@ -6,6 +6,7 @@ import { apagarCompromisso, novoCompromisso, registrarAgendamento } from '@/app/
 import { linkNovoEvento } from '@/lib/agenda-link';
 import { Field } from './dialog';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 // Botão + modal pra criar um compromisso no Google Agenda (também usado na tarefa).
 export function NovoCompromisso({
@@ -174,6 +175,7 @@ export function ApagarEvento({ id, titulo }: { id: string; titulo: string }) {
         start(async () => {
           const r = await apagarCompromisso(id);
           if (r?.erro) alert(r.erro);
+          else avisar('Compromisso apagado');
         })
       }
       aria-label="Apagar do Google Agenda"

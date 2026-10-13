@@ -5,6 +5,7 @@ import { MessageCircle } from 'lucide-react';
 import type { Charge } from '@/lib/db';
 import { linkCobranca, type ContatoCliente } from '@/lib/cobranca-zap';
 import { registrarContato } from '@/app/acoes/clientes';
+import { avisar } from './toast';
 
 // Abre o WhatsApp do cliente com a mensagem de cobrança pronta e já marca o contato de hoje.
 export function CobrarZap({ c, cliente, hoje, compacto }: { c: Charge; cliente: ContatoCliente; hoje: string; compacto?: boolean }) {
@@ -15,7 +16,7 @@ export function CobrarZap({ c, cliente, hoje, compacto }: { c: Charge; cliente: 
       href={linkCobranca(c, cliente, hoje)}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={() => start(() => registrarContato(c.client_id))}
+      onClick={() => start(async () => { await registrarContato(c.client_id); avisar('Contato anotado'); })}
       title={cliente.telefone ? 'Cobrar no WhatsApp (mensagem pronta)' : 'Cobrar no WhatsApp (cliente sem telefone: escolha o contato)'}
       aria-label={`Cobrar ${cliente.nome} no WhatsApp`}
       className={

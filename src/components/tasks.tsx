@@ -8,6 +8,7 @@ import type { Prioridade, Task, TaskStatus } from '@/lib/db';
 import { prazo } from '@/lib/dates';
 import { Empty } from './ui';
 import { PRIORIDADE, STATUS, type ResumoTarefa } from '@/lib/tarefas';
+import { avisar } from './toast';
 
 export type ClienteMin = { id: string; nome: string };
 
@@ -171,7 +172,7 @@ export function TaskRow({
 
       <button
         type="button"
-        onClick={() => confirm('Apagar esta tarefa?') && start(() => deleteTask(task.id))}
+        onClick={() => confirm('Apagar esta tarefa?') && start(async () => { await deleteTask(task.id); avisar('Tarefa apagada'); })}
         aria-label="Apagar tarefa"
         className="grid size-7 place-items-center rounded-md text-faint opacity-100 hover:bg-danger-soft hover:text-danger @2xl:opacity-0 @2xl:group-hover:opacity-100"
       >
@@ -219,6 +220,7 @@ function AddRow({ status, clientId, data }: { status: TaskStatus; clientId?: str
         start(async () => {
           await addTask(fd);
           ref.current?.reset();
+          avisar('Tarefa criada');
         })
       }
       className="flex items-center gap-2 px-3 py-1.5"

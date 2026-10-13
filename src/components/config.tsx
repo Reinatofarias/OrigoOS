@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react';
 import { deleteService, deleteTemplate, updateService, updateTemplate } from '@/app/actions';
 import type { Service, TaskTemplate } from '@/lib/db';
 import { PRIORIDADE } from './tasks';
+import { avisar } from './toast';
 
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
@@ -47,7 +48,7 @@ function Apagar({ onClick }: { onClick: () => void }) {
 
 export function ServiceRow({ s }: { s: Service }) {
   const [pending, start] = useTransition();
-  const up = (c: Partial<Service>) => start(() => updateService(s.id, c));
+  const up = (c: Partial<Service>) => start(async () => { await updateService(s.id, c); avisar('Serviço salvo'); });
   return (
     <div className={`grid gap-2 border-b border-line px-3 py-2.5 last:border-b-0 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)_110px_120px_40px_32px] md:items-center ${pending ? 'opacity-60' : ''} ${s.ativo ? '' : 'text-muted'}`}>
       <Texto label="Nome" valor={s.nome} salvar={(nome) => nome && up({ nome })} className="font-semibold" />
@@ -65,7 +66,7 @@ export function ServiceRow({ s }: { s: Service }) {
 
 export function TemplateRow({ t }: { t: TaskTemplate }) {
   const [pending, start] = useTransition();
-  const up = (c: Partial<TaskTemplate>) => start(() => updateTemplate(t.id, c));
+  const up = (c: Partial<TaskTemplate>) => start(async () => { await updateTemplate(t.id, c); avisar('Tarefa recorrente salva'); });
   return (
     <div className={`grid gap-2 border-b border-line px-3 py-2.5 last:border-b-0 md:grid-cols-[minmax(0,1fr)_170px_110px_110px_40px_32px] md:items-center ${pending ? 'opacity-60' : ''} ${t.ativo ? '' : 'text-muted'}`}>
       <Texto label="Tarefa" valor={t.titulo} salvar={(titulo) => titulo && up({ titulo })} className="font-medium" />

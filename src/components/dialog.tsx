@@ -3,6 +3,7 @@
 import { useRef, useTransition } from 'react';
 import { Plus, X } from 'lucide-react';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 // Botão que abre um formulário num modal. O formulário chama a server action e fecha.
 export default function FormDialog({
@@ -36,6 +37,7 @@ export default function FormDialog({
               await action(fd);
               form.current?.reset();
               ref.current?.close();
+              avisar('Salvo');
             })
           }
         >

@@ -5,6 +5,7 @@ import { db, type Contract, type Empresa, type Service } from '@/lib/db';
 import { STATUS_CONTRATO, TIPOS, clausulas, modeloDe, numeroContrato, type Clausula } from '@/lib/contrato';
 import { lerEmpresa } from '@/lib/contratos';
 import { Badge, Body, Card, PageHeader, btn } from '@/components/ui';
+import { SalvarBotao } from '@/components/salvar-botao';
 import { Field } from '@/components/dialog';
 import ContratoDoc from '@/components/contrato-doc';
 import { LinkAcoes } from '@/components/link-acoes';
@@ -145,7 +146,7 @@ export default async function ContratoPage({ params }: PageProps<'/contratos/[id
                     </Field>
                   </div>
                   <div>
-                    <button className={btn.primary}>Salvar dados</button>
+                    <SalvarBotao className={btn.primary} aviso="Dados salvos">Salvar dados</SalvarBotao>
                   </div>
                 </form>
                 </details>
