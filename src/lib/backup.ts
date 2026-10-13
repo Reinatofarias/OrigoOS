@@ -6,7 +6,7 @@ const TABELAS = [
   'clients', 'leads', 'tasks', 'routine_checks', 'charges', 'expenses', 'services', 'proposals', 'contracts', 'reports',
   'task_templates', 'task_runs', 'task_items', 'task_comments', 'client_requests', 'ad_metrics', 'settings',
 ];
-const SEGREDOS = ['seguranca', 'vapid', 'integracoes', 'google_agenda'];
+const SEGREDOS = ['seguranca', 'vapid', 'integracoes', 'google_agenda', 'avisos_relogio'];
 
 export async function gerarBackup(supa: SupabaseClient) {
   const tabelas: Record<string, unknown[]> = {};
