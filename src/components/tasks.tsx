@@ -106,7 +106,9 @@ export function TaskRow({
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             className={`cell-input min-w-0 flex-1 text-[13.5px] font-medium ${task.status === 'done' ? 'text-muted line-through' : ''}`}
           />
-          <Indicadores task={task} resumo={resumo} />
+          <span className="hidden md:flex">
+            <Indicadores task={task} resumo={resumo} />
+          </span>
           <Link
             href={`/tarefas/${task.id}`}
             title="Abrir detalhes"
@@ -117,9 +119,10 @@ export function TaskRow({
           </Link>
         </div>
         {/* No celular, cliente e prazo aparecem embaixo do nome */}
-        <p className="flex gap-2 px-1.5 text-[11.5px] text-muted md:hidden">
-          {cliente && !semCliente && <span>{cliente.nome}</span>}
-          {task.data && <span className={atrasada ? 'font-semibold text-danger' : ''}>{prazo(task.data, hoje)}</span>}
+        <p className="flex items-center gap-2 px-1.5 text-[11.5px] text-muted md:hidden">
+          {cliente && !semCliente && <span className="truncate">{cliente.nome}</span>}
+          {task.data && <span className={`shrink-0 ${atrasada ? 'font-semibold text-danger' : ''}`}>{prazo(task.data, hoje)}</span>}
+          <Indicadores task={task} resumo={resumo} />
         </p>
       </div>
 

@@ -116,8 +116,8 @@ export function Kpi({
   const cor = tone ? { success: 'text-success', warn: 'text-warn', danger: 'text-danger', brand: 'text-brand', info: 'text-info' }[tone] : '';
   return (
     <div className="min-w-0 rounded-xl border border-line bg-surface p-4 shadow-[0_1px_2px_rgba(20,21,46,0.04)]">
-      <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-[12.5px] font-medium text-muted">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[12.5px] font-medium leading-tight text-muted">{label}</p>
         {icon && <span className="text-faint">{icon}</span>}
       </div>
       <p className={`mt-1.5 truncate text-[22px] font-bold tracking-tight ${cor}`}>{value}</p>

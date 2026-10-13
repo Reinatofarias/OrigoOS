@@ -76,7 +76,7 @@ export default async function InicioPage() {
           </h1>
           <p className="mt-0.5 text-[13.5px] text-sidebar-ink">{notaDoDia(hoje)}</p>
           {metas && (
-            <Link href="/metas" className="mt-4 flex max-w-sm items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 hover:bg-white/[0.07]">
+            <Link href="/metas" className="mt-4 flex max-w-sm items-center gap-3 rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-md transition hover:bg-white/[0.1]">
               <span className="text-[12.5px] text-sidebar-ink">Meta</span>
               <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
                 <span className="bg-grad block h-full rounded-full" style={{ width: `${Math.min(100, (clientes.length / metas.clientes) * 100)}%` }} />
