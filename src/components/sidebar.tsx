@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, FileSignature, Wallet, LogOut, Activity, Target, Settings } from 'lucide-react';
+import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, FileSignature, Wallet, LogOut, Activity, Target, Settings, LayoutGrid, X } from 'lucide-react';
 import { logout } from '@/app/actions';
 import { Logo } from './logo';
 
@@ -12,10 +13,17 @@ const LINKS = [
   { href: '/agenda', label: 'Agenda', icon: CalendarDays },
   { href: '/comercial', label: 'Comercial', icon: KanbanSquare },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
-  // No celular, Contratos fica no ícone da barra de cima (a de baixo já tem 7 módulos).
-  { href: '/contratos', label: 'Contratos', icon: FileSignature, soComputador: true },
+  { href: '/contratos', label: 'Contratos', icon: FileSignature },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet },
   { href: '/metas', label: 'Metas', icon: Target },
+];
+
+// Celular: os 4 do dia a dia ficam na barra de baixo; o resto abre no botão "Mais".
+const NO_CELULAR = ['/', '/tarefas', '/agenda', '/clientes'];
+const MAIS = [
+  ...LINKS.filter((l) => !NO_CELULAR.includes(l.href)),
+  { href: '/configuracoes', label: 'Configurações', icon: Settings },
+  { href: '/status', label: 'Status', icon: Activity },
 ];
 
 function ativo(path: string, href: string) {
@@ -24,6 +32,9 @@ function ativo(path: string, href: string) {
 
 export default function Sidebar() {
   const path = usePathname();
+  const [mais, setMais] = useState(false);
+  const maisAtivo = MAIS.some((l) => ativo(path, l.href));
+  const item = 'flex min-w-0 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted transition aria-[current=page]:text-brand';
   return (
     <>
       {/* Desktop: menu lateral escuro */}
@@ -72,38 +83,55 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* Celular: barra de cima com a marca e barra de baixo com os módulos */}
+      {/* Celular: barra de cima só com a marca; módulos na barra de baixo */}
       <header className="sticky top-0 z-30 flex items-center justify-between bg-sidebar px-4 py-3 md:hidden">
         <Logo height={28} />
-        <span className="flex items-center">
-        <Link href="/contratos" className="rounded-lg p-2 text-sidebar-ink" aria-label="Contratos">
-          <FileSignature size={18} />
-        </Link>
-        <Link href="/configuracoes" className="rounded-lg p-2 text-sidebar-ink" aria-label="Configurações">
-          <Settings size={18} />
-        </Link>
-        <form action={logout}>
-          <button className="rounded-lg p-2 text-sidebar-ink" aria-label="Sair">
-            <LogOut size={18} />
-          </button>
-        </form>
-        </span>
       </header>
+
+      {mais && (
+        <div className="fixed inset-0 z-[45] bg-[rgb(10_11_26/0.35)] backdrop-blur-[3px] md:hidden" onClick={() => setMais(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute inset-x-3 bottom-[calc(72px+env(safe-area-inset-bottom))] rounded-2xl border border-line/60 bg-surface/80 p-2 shadow-2xl backdrop-blur-xl"
+          >
+            <div className="grid grid-cols-3 gap-1">
+              {MAIS.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMais(false)}
+                  aria-current={ativo(path, href) ? 'page' : undefined}
+                  className="flex flex-col items-center gap-1.5 rounded-xl py-3 text-[12px] font-medium text-ink transition hover:bg-surface-2 aria-[current=page]:bg-brand-soft aria-[current=page]:text-brand"
+                >
+                  <Icon size={20} strokeWidth={1.8} />
+                  {label}
+                </Link>
+              ))}
+              <form action={logout}>
+                <button className="flex w-full flex-col items-center gap-1.5 rounded-xl py-3 text-[12px] font-medium text-danger transition hover:bg-surface-2">
+                  <LogOut size={20} strokeWidth={1.8} />
+                  Sair
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-[46] grid grid-cols-5 border-t border-line/70 bg-surface/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
         aria-label="Principal"
       >
-        {LINKS.filter((l) => !('soComputador' in l)).map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            aria-current={ativo(path, href) ? 'page' : undefined}
-            className="flex min-w-0 flex-col items-center gap-0.5 py-2 text-[10px] font-medium text-muted aria-[current=page]:text-brand"
-          >
-            <Icon size={20} strokeWidth={1.8} />
+        {LINKS.filter((l) => NO_CELULAR.includes(l.href)).map(({ href, label, icon: Icon }) => (
+          <Link key={href} href={href} onClick={() => setMais(false)} aria-current={ativo(path, href) && !mais ? 'page' : undefined} className={item}>
+            <Icon size={21} strokeWidth={1.8} />
             {label}
           </Link>
         ))}
+        <button type="button" onClick={() => setMais((m) => !m)} aria-expanded={mais} aria-current={maisAtivo || mais ? 'page' : undefined} className={item}>
+          {mais ? <X size={21} strokeWidth={1.8} /> : <LayoutGrid size={21} strokeWidth={1.8} />}
+          Mais
+        </button>
       </nav>
     </>
   );
