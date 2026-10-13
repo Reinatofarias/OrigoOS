@@ -41,7 +41,7 @@ export function PageHeader({
         </nav>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-[20px] font-bold tracking-tight md:text-[22px]">{title}</h1>
           {subtitle && <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p>}
         </div>

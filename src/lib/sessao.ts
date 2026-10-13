@@ -70,3 +70,22 @@ export async function versaoValida(versao: number | null) {
 export function esquecerVersao() {
   memo = null;
 }
+
+// Login em duas etapas: depois da senha certa, um cookie curto prova que a senha já passou e a tela pede só o código.
+export const SENHA_OK_COOKIE = 'origo_senha_ok';
+export const SENHA_OK_MAX_AGE = 5 * 60;
+
+export function createSenhaOkToken() {
+  const payload = `senha-ok.${Date.now() + SENHA_OK_MAX_AGE * 1000}.${randomUUID()}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+export function verifySenhaOkToken(token: string | undefined) {
+  if (!token || !isLoginConfigured()) return false;
+  const parts = token.split('.');
+  if (parts.length !== 4 || parts[0] !== 'senha-ok') return false;
+  const expected = Buffer.from(sign(parts.slice(0, 3).join('.')));
+  const received = Buffer.from(parts[3]);
+  if (expected.length !== received.length || !timingSafeEqual(expected, received)) return false;
+  return Number(parts[1]) > Date.now();
+}

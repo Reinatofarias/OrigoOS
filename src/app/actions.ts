@@ -4,10 +4,23 @@ import { createHash, randomUUID } from 'node:crypto';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { APARELHO_COOKIE, checkPassword, createSessionToken, isLoginConfigured, requireAuth, SESSION_COOKIE, SESSION_MAX_AGE } from '@/lib/auth';
+import {
+  APARELHO_COOKIE,
+  checkPassword,
+  createSenhaOkToken,
+  createSessionToken,
+  isLoginConfigured,
+  requireAuth,
+  SENHA_OK_COOKIE,
+  SENHA_OK_MAX_AGE,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE,
+  verifySenhaOkToken,
+} from '@/lib/auth';
 import { codigoValido, lerSeguranca, loginTravado, nomeDoAparelho, quemPediu, registrar } from '@/lib/seguranca';
 import { db, type Charge, type Client, type Contract, type Contratante, type ItemProposta, type LeadStatus, type Prioridade, type Proposal, type Service, type TaskStatus, type TaskTemplate } from '@/lib/db';
-import { addDays, monthRange, today } from '@/lib/dates';
+import { addDays, formatShort, monthRange, today } from '@/lib/dates';
+import { PRIORIDADE, STATUS } from '@/lib/tarefas';
 import { ESPERA, NICHO, normalizeWhatsapp, type Passo } from '@/lib/prospeccao';
 import { CONDICOES_PADRAO, INTRODUCAO_PADRAO, itemDoServico, plataformaDosItens, totais } from '@/lib/propostas';
 import { criarOnboarding } from '@/lib/modelos';
@@ -17,24 +30,41 @@ import { chavesPush, enviarParaTodos, resumoDoDia } from '@/lib/push';
 import { somaDoMes } from '@/lib/anuncios';
 import { AsaasErro, buscarCobranca, camposDoPagamento, emitirCobranca, garantirCliente, removerCobranca } from '@/lib/asaas';
 
-export async function login(_: unknown, form: FormData): Promise<{ erro?: string; pedirCodigo?: boolean } | null> {
+export type EstadoLogin = { erro?: string; etapa?: 'senha' | 'codigo' } | null;
+
+// Login em duas etapas: primeiro a senha; se a verificação em duas etapas estiver ligada, depois o código do app.
+export async function login(_: unknown, form: FormData): Promise<EstadoLogin> {
   if (!isLoginConfigured()) return { erro: 'Login ainda não configurado: defina ORIGO_PASSWORD e ORIGO_SESSION_SECRET na Vercel.' };
   const supa = db();
   const quem = await quemPediu();
+  const store = await cookies();
   if (await loginTravado(supa, quem.ip)) {
     await registrar(supa, 'login_travado', quem);
     return { erro: 'Muitas tentativas erradas. Espere 15 minutos e tente de novo.' };
   }
   const seg = await lerSeguranca(supa);
-  if (!checkPassword(form.get('senha'))) {
-    await registrar(supa, 'login_falhou', quem);
-    return { erro: 'Senha incorreta.', pedirCodigo: seg.totp_ativo };
+  const opcoesCurtas = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' };
+
+  if (form.get('etapa') === 'codigo') {
+    if (!seg.totp_ativo || !verifySenhaOkToken(store.get(SENHA_OK_COOKIE)?.value)) {
+      store.delete(SENHA_OK_COOKIE);
+      return { erro: 'Passou muito tempo. Digite a senha de novo.', etapa: 'senha' };
+    }
+    if (!codigoValido(seg.totp_secret, form.get('codigo'))) {
+      await registrar(supa, 'login_falhou', quem);
+      return { erro: form.get('codigo') ? 'Código do autenticador errado ou vencido.' : 'Digite o código do app autenticador.', etapa: 'codigo' };
+    }
+  } else {
+    if (!checkPassword(form.get('senha'))) {
+      await registrar(supa, 'login_falhou', quem);
+      return { erro: 'Senha incorreta.', etapa: 'senha' };
+    }
+    if (seg.totp_ativo) {
+      store.set(SENHA_OK_COOKIE, createSenhaOkToken(), { ...opcoesCurtas, maxAge: SENHA_OK_MAX_AGE });
+      return { etapa: 'codigo' };
+    }
   }
-  if (seg.totp_ativo && !codigoValido(seg.totp_secret, form.get('codigo'))) {
-    await registrar(supa, 'login_falhou', quem);
-    return { erro: form.get('codigo') ? 'Código do autenticador errado ou vencido.' : 'Digite o código do app autenticador.', pedirCodigo: true };
-  }
-  const store = await cookies();
+  store.delete(SENHA_OK_COOKIE);
   // Cada aparelho ganha um código fixo, pra saber quando alguém entra de um aparelho novo.
   let aparelho = store.get(APARELHO_COOKIE)?.value;
   const { count } = aparelho ? await supa.from('access_log').select('id', { count: 'exact', head: true }).eq('evento', 'login').eq('aparelho', aparelho) : { count: 0 };
@@ -104,12 +134,33 @@ export async function updateTask(
     campos.status === undefined
       ? {}
       : { feita: campos.status === 'done', feita_em: campos.status === 'done' ? new Date().toISOString() : null };
+  const { data: antes } = await db().from('tasks').select('status, prioridade, data, client_id').eq('id', id).maybeSingle();
   const { data: t } = await db().from('tasks').update({ ...campos, ...extra }).eq('id', id).select('titulo, client_id').maybeSingle();
+  if (antes) await registrarMudancas(id, antes, campos);
   // Concluir feedback, reunião ou ligação com um cliente conta como contato (saúde do cliente).
   if (campos.status === 'done' && t?.client_id && CONTATO.test(t.titulo)) {
     await db().from('clients').update({ ultimo_contato: today() }).eq('id', t.client_id);
   }
   refresh();
+}
+
+// Histórico da tarefa (aparece na página de detalhes). Se a tabela da v6 ainda não existir, só não grava.
+async function registrarMudancas(
+  id: string,
+  antes: { status: TaskStatus; prioridade: Prioridade; data: string | null; client_id: string | null },
+  campos: Parameters<typeof updateTask>[1],
+) {
+  const linhas: string[] = [];
+  if (campos.status && campos.status !== antes.status) linhas.push(`Status: ${STATUS[antes.status].label} → ${STATUS[campos.status].label}`);
+  if (campos.prioridade && campos.prioridade !== antes.prioridade)
+    linhas.push(`Prioridade: ${PRIORIDADE[antes.prioridade].label} → ${PRIORIDADE[campos.prioridade].label}`);
+  if (campos.data !== undefined && campos.data !== antes.data)
+    linhas.push(campos.data ? `Prazo: ${formatShort(campos.data)}` : 'Prazo removido');
+  if (campos.client_id !== undefined && campos.client_id !== antes.client_id) {
+    const { data: c } = campos.client_id ? await db().from('clients').select('nome').eq('id', campos.client_id).maybeSingle() : { data: null };
+    linhas.push(c ? `Cliente: ${c.nome}` : 'Cliente removido');
+  }
+  if (linhas.length) await db().from('task_comments').insert(linhas.map((texto) => ({ task_id: id, texto, tipo: 'atividade' })));
 }
 
 const CONTATO = /feedback|reuni|call|ligar|liga[çc][ãa]o|conversa|alinhamento|relat[óo]rio/i;

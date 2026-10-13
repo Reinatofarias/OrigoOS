@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // Cópia de tudo do banco num arquivo só. Senhas e chaves (autenticador e push) ficam de fora.
 const TABELAS = [
   'clients', 'leads', 'tasks', 'routine_checks', 'charges', 'expenses', 'services', 'proposals', 'contracts', 'reports',
-  'task_templates', 'task_runs', 'client_requests', 'ad_metrics', 'settings',
+  'task_templates', 'task_runs', 'task_items', 'task_comments', 'client_requests', 'ad_metrics', 'settings',
 ];
 const SEGREDOS = ['seguranca', 'vapid', 'integracoes'];
 
