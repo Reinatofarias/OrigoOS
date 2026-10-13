@@ -6,6 +6,7 @@ import { excluirPedido, setPedidoStatus } from '@/app/acoes/clientes';
 import type { ClientRequest } from '@/lib/db';
 import { STATUS_PEDIDO } from '@/lib/pedidos';
 import { Badge } from './ui';
+import { avisar } from './toast';
 
 function Linha({ p }: { p: ClientRequest }) {
   const [pending, start] = useTransition();
@@ -19,7 +20,7 @@ function Linha({ p }: { p: ClientRequest }) {
       <Badge tone={STATUS_PEDIDO[p.status].tone}>{STATUS_PEDIDO[p.status].label}</Badge>
       <div className="flex gap-1">
         {p.status !== 'ok' ? (
-          <button type="button" onClick={() => start(() => setPedidoStatus(p.id, 'ok'))} title="Recebi, tudo certo" aria-label="Marcar como concluído" className="grid size-8 place-items-center rounded-lg text-success hover:bg-success-soft">
+          <button type="button" onClick={() => start(async () => { await setPedidoStatus(p.id, 'ok'); avisar('Pedido concluído'); })} title="Recebi, tudo certo" aria-label="Marcar como concluído" className="grid size-8 place-items-center rounded-lg text-success hover:bg-success-soft">
             <Check size={16} />
           </button>
         ) : null}
@@ -28,7 +29,7 @@ function Linha({ p }: { p: ClientRequest }) {
             <RotateCcw size={15} />
           </button>
         )}
-        <button type="button" onClick={() => confirm('Apagar este pedido?') && start(() => excluirPedido(p.id))} aria-label="Apagar" className="grid size-8 place-items-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger">
+        <button type="button" onClick={() => confirm('Apagar este pedido?') && start(async () => { await excluirPedido(p.id); avisar('Pedido apagado'); })} aria-label="Apagar" className="grid size-8 place-items-center rounded-lg text-muted hover:bg-danger-soft hover:text-danger">
           <Trash2 size={15} />
         </button>
       </div>

@@ -10,6 +10,7 @@ import { formatShort } from '@/lib/dates';
 import { Badge, Empty } from './ui';
 import { CobrarZap } from './cobrar-zap';
 import type { ContatoCliente } from '@/lib/cobranca-zap';
+import { avisar } from './toast';
 
 function Fatura({ c }: { c: Charge }) {
   if (!c.asaas_url) return null;
@@ -27,13 +28,14 @@ function Acoes({ c, asaas, contato, hoje }: { c: Charge; asaas?: boolean; contat
     start(async () => {
       const r = await emitirNoAsaas(c.id);
       if (r.erro) alert(`Não emiti no Asaas: ${r.erro}`);
+      else avisar('Cobrança emitida no Asaas');
     });
   if (c.status === 'pago' || c.status === 'cancelado') {
     return (
       <span className={`flex items-center justify-end gap-1 ${pending ? 'opacity-60' : ''}`}>
         <Fatura c={c} />
         {c.status === 'pago' && c.forma && <span className="mr-1 text-[12px] text-muted">{FORMA[c.forma]}</span>}
-        <button type="button" title="Voltar para aguardando" onClick={() => start(() => setChargeStatus(c.id, 'pendente'))} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-ink">
+        <button type="button" title="Voltar para aguardando" onClick={() => start(async () => { await setChargeStatus(c.id, 'pendente'); avisar('Voltou pra aguardando'); })} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-ink">
           <RotateCcw size={14} />
         </button>
       </span>
@@ -57,18 +59,18 @@ function Acoes({ c, asaas, contato, hoje }: { c: Charge; asaas?: boolean; contat
       </select>
       <button
         type="button"
-        onClick={() => start(() => setChargeStatus(c.id, 'pago', forma))}
+        onClick={() => start(async () => { await setChargeStatus(c.id, 'pago', forma); avisar('Pagamento registrado 💰'); })}
         className="inline-flex items-center gap-1 rounded-md bg-success-soft px-2 py-1 text-[12px] font-semibold text-success hover:opacity-80"
       >
         <CheckCircle2 size={13} /> Recebi
       </button>
-      <button type="button" title="Cancelar cobrança" onClick={() => start(() => setChargeStatus(c.id, 'cancelado'))} className="rounded-md p-1.5 text-faint hover:bg-surface-2 hover:text-ink">
+      <button type="button" title="Cancelar cobrança" onClick={() => start(async () => { await setChargeStatus(c.id, 'cancelado'); avisar('Cobrança cancelada'); })} className="rounded-md p-1.5 text-faint hover:bg-surface-2 hover:text-ink">
         <Ban size={14} />
       </button>
       <button
         type="button"
         title="Apagar cobrança"
-        onClick={() => confirm('Apagar esta cobrança?') && start(() => deleteCharge(c.id))}
+        onClick={() => confirm('Apagar esta cobrança?') && start(async () => { await deleteCharge(c.id); avisar('Cobrança apagada'); })}
         className="rounded-md p-1.5 text-faint hover:bg-danger-soft hover:text-danger"
       >
         <Trash2 size={14} />

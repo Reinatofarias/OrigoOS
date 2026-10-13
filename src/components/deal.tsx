@@ -6,6 +6,7 @@ import { convertLead, markSent, setLeadStatus, updateLead } from '@/app/actions'
 import type { Lead, LeadStatus } from '@/lib/db';
 import { ETAPAS, PASSOS, etapaDe, mensagem, proximoPasso, type Modelos, type Passo } from '@/lib/prospeccao';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 export function StageBar({ lead }: { lead: Lead }) {
   const [pending, start] = useTransition();
@@ -33,7 +34,7 @@ export function StageBar({ lead }: { lead: Lead }) {
 
 export function DealActions({ lead }: { lead: Lead }) {
   const [pending, start] = useTransition();
-  const set = (s: LeadStatus) => start(() => setLeadStatus(lead.id, s));
+  const set = (s: LeadStatus) => start(async () => { await setLeadStatus(lead.id, s); avisar('Etapa atualizada'); });
   if (lead.status === 'perdido') {
     return (
       <button type="button" disabled={pending} onClick={() => set('novo')} className={btn.secondary}>
@@ -44,7 +45,7 @@ export function DealActions({ lead }: { lead: Lead }) {
   return (
     <>
       {lead.status === 'fechou' && !lead.client_id ? (
-        <button type="button" disabled={pending} onClick={() => start(() => convertLead(lead.id))} className={btn.primary}>
+        <button type="button" disabled={pending} onClick={() => start(async () => { await convertLead(lead.id); avisar('Virou cliente 🎉'); })} className={btn.primary}>
           Transformar em cliente
         </button>
       ) : lead.status !== 'fechou' ? (
@@ -114,6 +115,7 @@ export function DealNotes({ lead }: { lead: Lead }) {
           start(async () => {
             await updateLead(lead.id, { notas: notas.trim() || null });
             setSalvo(true);
+            avisar('Anotações salvas');
           })
         }
         rows={6}

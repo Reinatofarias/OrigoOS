@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 import { MessageSquareCheck } from 'lucide-react';
 import { registrarContato } from '@/app/acoes/clientes';
+import { avisar } from './toast';
 
 // "Falei com ele hoje" direto no card de Saúde dos clientes, sem abrir a ficha.
 export function FaleiHoje({ clientId }: { clientId: string }) {
@@ -16,6 +17,7 @@ export function FaleiHoje({ clientId }: { clientId: string }) {
         start(async () => {
           await registrarContato(clientId);
           setFeito(true);
+          avisar('Contato anotado');
         })
       }
       className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[12px] font-semibold text-brand transition hover:bg-brand-soft disabled:text-success disabled:hover:bg-transparent"

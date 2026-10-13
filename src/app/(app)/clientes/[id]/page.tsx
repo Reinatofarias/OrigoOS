@@ -17,6 +17,7 @@ import { CHECKLIST, PLATAFORMA } from '@/lib/rotina';
 import { garantirRecorrentes } from '@/lib/modelos';
 import { asaasConfigurado } from '@/lib/asaas';
 import { Avatar, Badge, Body, Card, Empty, Kpi, PageHeader, Tabs, btn } from '@/components/ui';
+import { SalvarBotao } from '@/components/salvar-botao';
 import { ChargeTable } from '@/components/charges';
 import { TaskGroups, TaskRow } from '@/components/tasks';
 import { resumosDas } from '@/lib/tarefas';
@@ -179,7 +180,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                     )}
                     <form action={registrarContato.bind(null, id)} className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
                       <span className="flex-1 text-[12.5px] text-muted">Último contato: {cliente.ultimo_contato ? prazo(cliente.ultimo_contato, hoje) : 'nunca registrado'}</span>
-                      <button className={btn.secondary}>Falei com ele hoje</button>
+                      <SalvarBotao className={btn.secondary} aviso="Contato anotado">Falei com ele hoje</SalvarBotao>
                     </form>
                   </Card>
                 )}
@@ -221,9 +222,9 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                   <Card title="Onboarding">
                     <p className="text-[13px] text-muted">Esse cliente ainda não tem o checklist de entrada.</p>
                     <form action={aplicarOnboarding.bind(null, id)} className="mt-3">
-                      <button className={btn.secondary}>
+                      <SalvarBotao className={btn.secondary} aviso="Checklist criado">
                         <Rocket size={14} /> Criar checklist de onboarding
-                      </button>
+                      </SalvarBotao>
                     </form>
                   </Card>
                 )}
@@ -330,9 +331,9 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
             aside={
               <form action={novoRelatorio.bind(null, id)} className="flex items-center gap-2">
                 <input type="month" name="competencia" defaultValue={mesPassado} aria-label="Mês" className="field w-auto py-1.5" />
-                <button className={btn.primary}>
+                <SalvarBotao className={btn.primary} aviso="Relatório criado">
                   <Plus size={14} /> Criar relatório
-                </button>
+                </SalvarBotao>
               </form>
             }
           >
@@ -376,7 +377,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                   <input name="meta_conversoes" defaultValue={cliente.meta_conversoes ?? ''} placeholder={CONVERSOES_META_PADRAO.join(', ')} className="field mt-2 text-[12px]" />
                 </details>
                 <div>
-                  <button className={btn.primary}>Salvar contas</button>
+                  <SalvarBotao className={btn.primary} aviso="Contas salvas">Salvar contas</SalvarBotao>
                 </div>
               </form>
               <div className="mt-4 grid gap-2 border-t border-line pt-4 text-[12.5px] text-muted">
@@ -448,9 +449,9 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
               <form action={adicionarPedido.bind(null, id)} className="flex flex-wrap gap-2 border-t border-line p-4">
                 <input name="titulo" required placeholder="Novo pedido (ex.: fotos da equipe)" className="field min-w-[180px] flex-1" />
                 <input name="descricao" placeholder="Detalhe (opcional)" className="field min-w-[180px] flex-1" />
-                <button className={btn.primary}>
+                <SalvarBotao className={btn.primary} aviso="Pedido adicionado">
                   <Plus size={14} /> Adicionar
-                </button>
+                </SalvarBotao>
               </form>
             </Card>
             <Card title="Link do portal">
@@ -481,7 +482,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                 <input type="checkbox" name="recorrentes" defaultChecked={cliente.recorrentes} className="size-4 accent-[var(--brand)]" /> Criar as tarefas recorrentes (rotina de tráfego) pra esse cliente
               </label>
               <div>
-                <button className={btn.primary}>Salvar alterações</button>
+                <SalvarBotao className={btn.primary} aviso="Alterações salvas">Salvar alterações</SalvarBotao>
               </div>
             </form>
           </Card>

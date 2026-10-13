@@ -4,6 +4,7 @@ import { useTransition } from 'react';
 import { Trash2 } from 'lucide-react';
 import { excluirCliente } from '@/app/acoes/clientes';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 // Excluir de vez (pra testes ou cadastro errado). Cliente que só parou fica como inativo.
 export function ExcluirCliente({ id, nome, compacto }: { id: string; nome: string; compacto?: boolean }) {
@@ -16,6 +17,7 @@ export function ExcluirCliente({ id, nome, compacto }: { id: string; nome: strin
     start(async () => {
       const r = await excluirCliente(id, !compacto);
       if (r?.erro) alert(r.erro);
+      else avisar('Cliente excluído');
     });
   };
   if (compacto)

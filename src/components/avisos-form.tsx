@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import type { Preferencias } from '@/lib/avisos';
 import { salvarAvisos } from '@/app/acoes/avisos';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 const ITENS: { k: keyof Preferencias; titulo: string; quando: string }[] = [
   { k: 'resumo', titulo: 'Resumo do dia', quando: 'Seg a sex, 7h51: 3 tarefas principais, agenda, prospecção e cobranças' },
@@ -25,6 +26,7 @@ export default function AvisosForm({ prefs }: { prefs: Preferencias }) {
         start(async () => {
           await salvarAvisos(fd);
           setSalvo(true);
+          avisar('Notificações salvas');
         })
       }
       className="grid gap-3"

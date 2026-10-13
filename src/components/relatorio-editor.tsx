@@ -10,6 +10,7 @@ import { Field } from './dialog';
 import { LinkAcoes } from './link-acoes';
 import RelatorioDoc from './relatorio-doc';
 import { btn } from './ui';
+import { avisar } from './toast';
 
 const num = (v: string) => {
   const t = v.trim();
@@ -61,7 +62,7 @@ export default function RelatorioEditor({ r, anterior, cliente, telefone, link }
       <div className={`grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 ${pending ? 'opacity-70' : ''}`}>
         <section className="grid gap-3 rounded-xl border border-line bg-surface p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" disabled={pending || !sujo} onClick={() => start(() => salvarRelatorio(r.id, dados()))} className={btn.primary}>
+            <button type="button" disabled={pending || !sujo} onClick={() => start(async () => { await salvarRelatorio(r.id, dados()); avisar('Relatório salvo'); })} className={btn.primary}>
               <Save size={15} /> {pending ? 'Salvando…' : sujo ? 'Salvar' : 'Salvo'}
             </button>
             {sujo && <span className="text-[12px] text-warn">O link mostra a última versão salva.</span>}

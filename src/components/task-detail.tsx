@@ -8,6 +8,7 @@ import { addComment, addItem, deleteComment, deleteItem, updateItem } from '@/ap
 import type { Prioridade, Task, TaskComment, TaskItem, TaskStatus } from '@/lib/db';
 import { PRIORIDADE, STATUS } from '@/lib/tarefas';
 import { btn } from '@/components/ui';
+import { avisar } from './toast';
 
 function StatusIcon({ status, size = 18 }: { status: TaskStatus; size?: number }) {
   const cor = STATUS[status].cor;
@@ -155,6 +156,7 @@ export function TaskDescription({ task }: { task: Task }) {
           start(async () => {
             await updateTask(task.id, { descricao: texto.trim() || null });
             setSalvo(true);
+            avisar('Descrição salva');
           })
         }
         rows={6}
@@ -230,6 +232,7 @@ export function TaskChecklist({ taskId, itens }: { taskId: string; itens: TaskIt
           start(async () => {
             await addItem(taskId, novo);
             setNovo('');
+            avisar('Subtarefa adicionada');
           });
         }}
         className="flex items-center gap-2 border-t border-line px-4 py-2"

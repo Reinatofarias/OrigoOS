@@ -7,6 +7,7 @@ import { REDES, TIPOS, VIGENCIAS } from '@/lib/contrato';
 import { brl } from '@/lib/format';
 import { btn } from './ui';
 import { Field } from './dialog';
+import { avisar } from './toast';
 
 type Cliente = { id: string; nome: string; mensalidade: number | null; dia_vencimento: number; plataforma: string };
 
@@ -93,7 +94,10 @@ export function ContratoEscolhas({
         start(async () => {
           const r = await acao(fd);
           if (r?.erro) setErro(r.erro);
-          else setOk(true);
+          else {
+            setOk(true);
+            avisar('Contrato salvo');
+          }
         });
       }}
       className="grid gap-5"

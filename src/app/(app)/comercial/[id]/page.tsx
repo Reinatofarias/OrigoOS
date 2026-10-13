@@ -10,6 +10,7 @@ import { brl } from '@/lib/format';
 import { NICHO, formatWhatsapp } from '@/lib/prospeccao';
 import { lerModelos } from '@/lib/mensagens';
 import { Avatar, Badge, Body, Card, PageHeader, btn } from '@/components/ui';
+import { SalvarBotao } from '@/components/salvar-botao';
 import { Cadence, DealActions, DealField, DealNotes, StageBar } from '@/components/deal';
 
 export default async function NegocioPage({ params }: PageProps<'/comercial/[id]'>) {
@@ -123,9 +124,9 @@ export default async function NegocioPage({ params }: PageProps<'/comercial/[id]
               title="Propostas"
               aside={
                 <form action={novaProposta.bind(null, lead.id)}>
-                  <button className={btn.secondary}>
+                  <SalvarBotao className={btn.secondary} aviso="Proposta criada">
                     <Plus size={14} /> Criar proposta
-                  </button>
+                  </SalvarBotao>
                 </form>
               }
             >

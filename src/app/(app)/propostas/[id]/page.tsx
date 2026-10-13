@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { db, type Proposal, type Service } from '@/lib/db';
 import { STATUS_PROPOSTA, numeroProposta } from '@/lib/propostas';
 import { Badge, Body, PageHeader, btn } from '@/components/ui';
+import { SalvarBotao } from '@/components/salvar-botao';
 import PropostaEditor from '@/components/proposta-editor';
 
 export default async function PropostaPage({ params }: PageProps<'/propostas/[id]'>) {
@@ -43,9 +44,9 @@ export default async function PropostaPage({ params }: PageProps<'/propostas/[id
         ) : (
           p.status === 'aceita' && (
             <form action={gerarContrato.bind(null, p.id)}>
-              <button className={btn.secondary}>
+              <SalvarBotao className={btn.secondary} aviso="Contrato gerado">
                 <FileSignature size={15} /> Gerar contrato
-              </button>
+              </SalvarBotao>
             </form>
           )
         )}
