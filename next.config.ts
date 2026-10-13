@@ -14,6 +14,8 @@ const seguranca = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Voltar pra uma tela aberta há menos de 30s não busca tudo de novo (salvar algo sempre atualiza).
+  experimental: { staleTimes: { dynamic: 30 } },
   async headers() {
     return [
       { source: "/:path*", headers: seguranca },
