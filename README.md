@@ -8,6 +8,7 @@ Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
 
 - **Início** (`/`): resumo do dia com tarefas de hoje, prospecção do dia, rotina de tráfego por cliente, cobranças da semana e rotina pessoal.
 - **Tarefas** (`/tarefas`): lista no estilo ClickUp, agrupada por status (A fazer, Em andamento, Concluído), com cliente, prazo e prioridade editáveis na linha.
+- **Agenda** (`/agenda`): semana com os compromissos do Google Agenda e as tarefas com prazo. Cria compromisso com link do Meet, mostra a agenda de hoje no Início e agenda direto da tarefa.
 - **Comercial** (`/comercial`): funil no estilo Pipedrive, com quadro arrastável, lista e perdidos. Cada negócio (`/comercial/[id]`) tem barra de etapas, mensagens M1 a M4 com WhatsApp, anotações, Ganho/Perdido e "Transformar em cliente".
 - **Clientes** (`/clientes`): carteira no estilo Asaas, com receita recorrente, recebido, a receber e vencido. Cada cliente (`/clientes/[id]`) tem visão geral, cobranças, tarefas e dados cadastrais.
 - **Financeiro** (`/financeiro`): mês a mês, com mensalidades geradas automaticamente, baixa de pagamento, despesas e resultado.
@@ -21,6 +22,12 @@ Stack: Next.js 16 (App Router) + Supabase + Vercel. Sem servidor próprio.
    - `ORIGO_PASSWORD`: a senha que você vai usar para entrar.
    - `ORIGO_SESSION_SECRET`: um texto longo e aleatório.
 3. Faça o deploy e entre com a senha.
+
+## Google Agenda (opcional)
+
+1. No Google Cloud, ative a Google Calendar API, configure a tela de permissão OAuth (Externo, **publicada em produção**, senão a conexão cai a cada 7 dias) e crie um ID do cliente OAuth do tipo Aplicativo da Web com o redirecionamento `https://SEU-SITE/api/google-agenda/callback`.
+2. Na Vercel, cadastre `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` e faça um novo deploy.
+3. Em Configurações > Integrações, clique em **Conectar Google Agenda**. O acesso fica guardado no banco, criptografado com o `ORIGO_SESSION_SECRET` (trocar esse segredo exige conectar de novo), e fica fora do backup.
 
 ## Segurança
 

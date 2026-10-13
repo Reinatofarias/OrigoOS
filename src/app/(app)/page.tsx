@@ -14,6 +14,9 @@ import { Badge, Body, Card, Empty, Kpi } from '@/components/ui';
 import { TodayTasks } from '@/components/tasks';
 import { resumosDas } from '@/lib/tarefas';
 import RoutineToggle from '@/components/routine';
+import { listarEventos, situacaoAgenda, type Evento } from '@/lib/google-agenda';
+import { NovoCompromisso } from '@/components/agenda';
+import { ItensDoDia } from '@/components/agenda-dia';
 
 const META_DIA = 5;
 
@@ -57,6 +60,9 @@ export default async function InicioPage() {
   const grupos = [...new Set(rotina.map((t) => t.titulo))];
   const pipeline = (abertos ?? []).reduce((s, l) => s + Number(l.valor ?? 0), 0);
   const aReceber = (mes ?? []).filter((c) => c.status === 'pendente').reduce((s, c) => s + Number(c.valor), 0);
+  // Agenda de hoje: só aparece com o Google Agenda conectado. Se o Google falhar, o Início segue normal.
+  const agenda = await situacaoAgenda(supa).catch(() => null);
+  const eventos: Evento[] | null = agenda?.conectada ? await listarEventos(supa, hoje, hoje).catch(() => null) : null;
   const vencido = cobrancas.filter((c) => situacao(c, hoje) === 'vencido').reduce((s, c) => s + Number(c.valor), 0);
 
   return (
@@ -116,6 +122,20 @@ export default async function InicioPage() {
           </div>
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+            {agenda?.conectada && (
+              <Card title="Agenda de hoje" aside={<Link href="/agenda" className="font-semibold text-brand">Ver semana</Link>}>
+                {eventos === null ? (
+                  <p className="text-[13px] text-danger">Não consegui ler o Google Agenda agora.</p>
+                ) : eventos.length ? (
+                  <ItensDoDia eventos={eventos} tarefas={[]} />
+                ) : (
+                  <p className="text-[13px] text-muted">Nenhum compromisso hoje.</p>
+                )}
+                <div className="mt-3">
+                  <NovoCompromisso dia={hoje} variant="secondary" />
+                </div>
+              </Card>
+            )}
             <Card title="Saúde dos clientes" aside={<Link href="/clientes" className="hover:text-ink">{saude.filter((c) => c.nivel === 'ok').length}/{saude.length} em dia</Link>}>
               {saude.every((c) => c.nivel === 'ok') ? (
                 <Empty>Todos os clientes em dia.</Empty>
