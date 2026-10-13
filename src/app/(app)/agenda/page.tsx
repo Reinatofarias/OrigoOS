@@ -27,7 +27,7 @@ export default async function AgendaPage({ searchParams }: PageProps<'/agenda'>)
   ]);
   let eventos: Evento[] = [];
   let erro: string | null = null;
-  if (situacao.conectada) {
+  if (situacao.ve) {
     try {
       eventos = await listarEventos(supa, inicio, fim);
     } catch (e) {
@@ -40,13 +40,13 @@ export default async function AgendaPage({ searchParams }: PageProps<'/agenda'>)
 
   return (
     <>
-      <PageHeader title="Agenda" subtitle={situacao.conectada ? `Google Agenda${situacao.email ? ` de ${situacao.email}` : ''} e tarefas com prazo` : 'Tarefas com prazo'}>
-        {situacao.conectada && <NovoCompromisso dia={pedido >= inicio && pedido <= fim && pedido !== inicio ? pedido : inicio <= hoje && hoje <= fim ? hoje : inicio} />}
+      <PageHeader title="Agenda" subtitle={situacao.ve ? `Google Agenda${situacao.email ? ` de ${situacao.email}` : ''} e tarefas com prazo` : 'Tarefas com prazo'}>
+        {situacao.ve && <NovoCompromisso modo={situacao.conectada ? 'api' : 'link'} dia={pedido >= inicio && pedido <= fim && pedido !== inicio ? pedido : inicio <= hoje && hoje <= fim ? hoje : inicio} />}
       </PageHeader>
       <Body wide>
-        {!situacao.conectada && (
+        {!situacao.ve && (
           <p className="rounded-lg border border-brand/30 bg-brand-soft px-4 py-3 text-[13px]">
-            {situacao.configurada ? 'Falta conectar sua conta Google pra ver e criar compromissos aqui.' : 'Pra ver e criar compromissos do Google Agenda aqui, siga o passo a passo em Configurações.'}{' '}
+            {situacao.configurada ? 'Falta conectar sua conta Google pra ver e criar compromissos aqui.' : 'Pra ver seus compromissos do Google Agenda aqui, cole o endereço secreto da agenda na Vercel (passo a passo em Configurações).'}{' '}
             <Link href="/configuracoes?tab=integracoes" className="font-semibold text-brand underline">
               {situacao.configurada ? 'Conectar Google Agenda' : 'Abrir Configurações'}
             </Link>

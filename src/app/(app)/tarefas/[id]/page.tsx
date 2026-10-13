@@ -91,12 +91,13 @@ export default async function TarefaPage({ params }: PageProps<'/tarefas/[id]'>)
                   Abrir {cliente.nome}
                 </Link>
               )}
-              {agenda?.conectada && (
+              {agenda?.ve && (
                 <div className="mt-3 border-t border-line pt-3">
                   <NovoCompromisso
                     label="Agendar no Google Agenda"
                     variant="secondary"
                     taskId={task.id}
+                    modo={agenda.conectada ? 'api' : 'link'}
                     titulo={cliente ? `${task.titulo} · ${cliente.nome}` : task.titulo}
                     descricao={task.descricao ?? ''}
                     dia={task.data && task.data >= hoje ? task.data : hoje}

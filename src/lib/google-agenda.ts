@@ -2,6 +2,7 @@ import 'server-only';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { TZ } from './dates';
+import { enderecoIcal, icalPublico, listarEventosIcal } from './agenda-ical';
 
 // Google Agenda: o Renato conecta a conta Google uma vez (OAuth) e o sistema lê e cria eventos na agenda principal.
 // Variáveis na Vercel:
@@ -32,6 +33,7 @@ export type Evento = {
   link: string | null;
   meet: string | null;
   local: string | null;
+  soLeitura?: boolean; // veio do endereço iCal: não dá pra apagar daqui
 };
 
 // Criptografia do refresh token (AES-256-GCM). A chave sai do segredo da sessão.
@@ -59,9 +61,12 @@ async function lerConexao(supa: SupabaseClient) {
 }
 
 // O que a tela precisa saber, sem expor o token.
+// conectada: conta Google ligada pelo OAuth (lê e cria). ical: endereço secreto na Vercel (só lê).
+// ve: dá pra mostrar a agenda por algum dos dois.
 export async function situacaoAgenda(supa: SupabaseClient) {
   const c = agendaConfigurada() ? await lerConexao(supa) : null;
-  return { configurada: agendaConfigurada(), conectada: !!c, email: c?.email ?? null, desde: c?.conectado_em ?? null };
+  const ical = !!enderecoIcal();
+  return { configurada: agendaConfigurada(), conectada: !!c, email: c?.email ?? null, desde: c?.conectado_em ?? null, ical, icalPublico: icalPublico(), ve: !!c || ical };
 }
 
 export function linkDeConexao(origem: string, estado: string) {
@@ -165,6 +170,7 @@ const noFuso = (dia: string, hora = '00:00') => `${dia}T${hora}:00-03:00`;
 
 // Eventos entre dois dias (inclusive), já em ordem.
 export async function listarEventos(supa: SupabaseClient, de: string, ate: string) {
+  if (!(agendaConfigurada() && (await lerConexao(supa))) && enderecoIcal()) return listarEventosIcal(de, ate);
   const eventos: Evento[] = [];
   let pagina: string | undefined;
   do {

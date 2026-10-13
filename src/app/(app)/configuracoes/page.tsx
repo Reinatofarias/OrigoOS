@@ -377,6 +377,43 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                 )}
                 <div className="grid gap-5 lg:grid-cols-2">
                   <div>
+                    <p className="text-[13px] font-semibold">Jeito simples (recomendado)</p>
+                    <ul className="mt-2 grid gap-2 text-[13.5px]">
+                      <Item ok={agenda.ical && !agenda.icalPublico}>
+                        {!agenda.ical ? (
+                          <>Falta <code className="rounded bg-surface-2 px-1">GOOGLE_AGENDA_ICS</code> na Vercel</>
+                        ) : agenda.icalPublico ? (
+                          'Está usando o endereço público: troque pelo endereço secreto e deixe a agenda privada'
+                        ) : (
+                          'Endereço secreto da agenda configurado: o Origo OS mostra seus compromissos'
+                        )}
+                      </Item>
+                    </ul>
+                    <ol className="mt-3 grid list-decimal gap-2 pl-5 text-[13px] leading-relaxed">
+                      <li>
+                        No computador, abra <strong>calendar.google.com</strong>, clique na engrenagem e em <strong>Configurações</strong>.
+                      </li>
+                      <li>Na esquerda, em &quot;Configurações das minhas agendas&quot;, clique na sua agenda (o seu nome).</li>
+                      <li>
+                        Em <strong>Permissões de acesso</strong>, deixe <strong>desmarcado</strong> &quot;Disponibilizar publicamente&quot;.
+                      </li>
+                      <li>
+                        Desça até <strong>Integrar agenda</strong> e copie o <strong>Endereço secreto no formato iCal</strong> (clique no olho pra mostrar). Ele termina em <code className="rounded bg-surface-2 px-1">basic.ics</code> e tem <code className="rounded bg-surface-2 px-1">/private-</code> no meio.
+                      </li>
+                      <li>
+                        Na Vercel, crie <code className="rounded bg-surface-2 px-1">GOOGLE_AGENDA_ICS</code> com esse endereço e faça um novo deploy.
+                      </li>
+                    </ol>
+                    <p className="mt-3 text-[12.5px] text-muted">
+                      Esse endereço funciona como uma senha da sua agenda: só na Vercel, nunca no chat. Pra criar compromisso, o botão abre o Google Agenda já preenchido e você salva lá (o Meet é um clique). A agenda atualiza a cada 2 minutos.
+                    </p>
+                  </div>
+                  <details className="rounded-lg border border-line p-3 lg:self-start" open={agenda.configurada}>
+                    <summary className="cursor-pointer text-[13px] font-semibold">Jeito completo (opcional): conectar a conta pelo Google Cloud</summary>
+                    <p className="mt-2 text-[12.5px] text-muted">Cria e apaga compromisso com Meet direto daqui, sem abrir o Google. Precisa configurar um app no Google Cloud.</p>
+                    <div className="mt-3">
+                <div className="grid gap-5 ">
+                  <div>
                     <ul className="grid gap-2 text-[13.5px]">
                       <Item ok={agenda.configurada}>
                         {agenda.configurada ? 'ID e chave do Google configurados na Vercel' : <>Faltam <code className="rounded bg-surface-2 px-1">GOOGLE_CLIENT_ID</code> e <code className="rounded bg-surface-2 px-1">GOOGLE_CLIENT_SECRET</code> na Vercel</>}
@@ -421,6 +458,9 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                     </ol>
                     <p className="mt-3 text-[12.5px] text-muted">O ID e a chave ficam só na Vercel; nunca mande pelo chat.</p>
                   </div>
+                </div>
+                    </div>
+                  </details>
                 </div>
               </Card>
             )}

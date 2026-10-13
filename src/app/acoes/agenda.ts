@@ -70,3 +70,13 @@ export async function desconectarAgenda() {
   await desconectar(db());
   revalidatePath('/', 'layout');
 }
+
+// Modo iCal: o compromisso é salvo no próprio Google Agenda; aqui só fica o registro na tarefa.
+export async function registrarAgendamento(taskId: string, dia: string, hora: string | null, usarComoPrazo: boolean) {
+  await requireAuth();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dia)) return;
+  const supa = db();
+  await supa.from('task_comments').insert({ task_id: taskId, tipo: 'atividade', texto: `Abriu no Google Agenda: ${formatShort(dia)}${hora && /^\d{2}:\d{2}$/.test(hora) ? ` às ${hora}` : ''}` });
+  if (usarComoPrazo) await supa.from('tasks').update({ data: dia }).eq('id', taskId);
+  revalidatePath('/', 'layout');
+}
