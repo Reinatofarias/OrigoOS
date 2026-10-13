@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ExcluirCliente } from '@/components/excluir-cliente';
-import { ChevronRight, FileSignature } from 'lucide-react';
+import { ChevronRight, FileSignature, Building2 } from 'lucide-react';
 import { db, type Charge, type Client } from '@/lib/db';
 import { monthRange, today } from '@/lib/dates';
 import { brl, situacao } from '@/lib/format';
@@ -107,7 +107,7 @@ export default async function ClientesPage() {
               </table>
             </div>
           ) : (
-            <Empty>Nenhum cliente cadastrado ainda.</Empty>
+            <Empty icon={<Building2 size={20} strokeWidth={1.8} />}>Nenhum cliente cadastrado ainda.</Empty>
           )}
         </Card>
       </Body>

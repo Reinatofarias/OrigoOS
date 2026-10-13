@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Inbox } from 'lucide-react';
 
 export const btn = {
   primary:
@@ -52,7 +52,7 @@ export function PageHeader({
 }
 
 export function Body({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
-  return <main className={`mx-auto grid w-full grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6 md:px-8 ${wide ? '' : 'max-w-[1280px]'}`}>{children}</main>;
+  return <main className={`animate-entrada mx-auto grid w-full grid-cols-[minmax(0,1fr)] gap-6 px-4 py-6 md:px-8 ${wide ? '' : 'max-w-[1280px]'}`}>{children}</main>;
 }
 
 export function Card({
@@ -148,8 +148,15 @@ export function Avatar({ nome, size = 32 }: { nome: string; size?: number }) {
   );
 }
 
-export function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="px-4 py-6 text-center text-[13px] text-muted">{children}</p>;
+// Tela vazia: ícone num círculo suave + texto, e um botão quando houver próximo passo óbvio.
+export function Empty({ children, icon, action }: { children: React.ReactNode; icon?: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-2.5 px-4 py-7 text-center">
+      <span className="grid size-11 place-items-center rounded-full bg-brand-soft text-brand ring-4 ring-brand-soft/40">{icon ?? <Inbox size={20} strokeWidth={1.8} />}</span>
+      <p className="max-w-sm text-[13px] leading-relaxed text-muted">{children}</p>
+      {action}
+    </div>
+  );
 }
 
 export function Tabs({ items, active }: { items: { href: string; label: string; count?: number; key: string }[]; active: string }) {

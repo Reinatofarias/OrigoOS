@@ -92,7 +92,7 @@ export default function Sidebar() {
         <div className="fixed inset-0 z-[45] bg-[rgb(10_11_26/0.35)] backdrop-blur-[3px] md:hidden" onClick={() => setMais(false)}>
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute inset-x-3 bottom-[calc(72px+env(safe-area-inset-bottom))] rounded-2xl border border-line/60 bg-surface/80 p-2 shadow-2xl backdrop-blur-xl"
+            className="animate-subir absolute inset-x-3 bottom-[calc(72px+env(safe-area-inset-bottom))] rounded-2xl border border-line/60 bg-surface/80 p-2 shadow-2xl backdrop-blur-xl"
           >
             <div className="grid grid-cols-3 gap-1">
               {MAIS.map(({ href, label, icon: Icon }) => (

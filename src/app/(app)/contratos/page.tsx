@@ -94,7 +94,7 @@ export default async function ContratosPage() {
                 })}
               </ul>
             ) : (
-              <Empty>Nenhum contrato ainda. Use &quot;Novo contrato&quot; pra criar o primeiro.</Empty>
+              <Empty icon={<FileSignature size={20} strokeWidth={1.8} />}>Nenhum contrato ainda. Use &quot;Novo contrato&quot; pra criar o primeiro.</Empty>
             )}
             {semContrato.length > 0 && contratos.length > 0 && (
               <p className="border-t border-line px-4 py-3 text-[12.5px] text-muted">Sem contrato: {semContrato.map((c) => c.nome).join(', ')}.</p>

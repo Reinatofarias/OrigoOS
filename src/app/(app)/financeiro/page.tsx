@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Receipt } from 'lucide-react';
 import { db, type Charge, type Expense } from '@/lib/db';
 import { addMonths, formatMonth, formatShort, monthRange, today } from '@/lib/dates';
 import { CATEGORIAS, brl, situacao } from '@/lib/format';
@@ -127,7 +127,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps<'/finan
               </tbody>
             </table>
           ) : (
-            <Empty>Nenhuma despesa lançada nesse mês.</Empty>
+            <Empty icon={<Receipt size={20} strokeWidth={1.8} />}>Nenhuma despesa lançada nesse mês.</Empty>
           )}
         </Card>
       </Body>

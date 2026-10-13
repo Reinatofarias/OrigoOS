@@ -107,7 +107,7 @@ export default async function InicioPage() {
 
             <Card title="Prospecção de hoje" aside="13h30 às 14h30">
               {followups.length + novos.length === 0 ? (
-                <Empty>
+                <Empty icon={<Target size={20} strokeWidth={1.8} />}>
                   Sem leads pra hoje. <Link href="/comercial" className="font-semibold text-brand">Abrir o funil</Link>
                 </Empty>
               ) : (
@@ -208,7 +208,7 @@ export default async function InicioPage() {
                   })}
                 </ul>
               ) : (
-                <Empty>Nenhuma cobrança vencendo nos próximos 7 dias.</Empty>
+                <Empty icon={<Wallet size={20} strokeWidth={1.8} />}>Nenhuma cobrança vencendo nos próximos 7 dias.</Empty>
               )}
             </Card>
 

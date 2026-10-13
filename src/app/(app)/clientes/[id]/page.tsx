@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
-import { Mail, Phone, FileText, CalendarDays, Rocket, FileSignature, BarChart3, Plus, HeartPulse, ListPlus, RefreshCcw } from 'lucide-react';
+import { Mail, Phone, FileText, CalendarDays, Rocket, FileSignature, BarChart3, Plus, HeartPulse, ListPlus, RefreshCcw, ListChecks, FileBarChart } from 'lucide-react';
 import { db, type AdMetric, type Charge, type Client, type ClientRequest, type Contract, type Report, type Task } from '@/lib/db';
 import { NIVEL, saudeDosClientes } from '@/lib/saude';
 import { CONVERSOES_META_PADRAO, metaConfigurado } from '@/lib/anuncios';
@@ -153,9 +153,9 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
                 <Card title="Tarefas abertas" aside={<a href={`${base}?tab=tarefas`} className="font-semibold text-brand">Ver todas</a>} flush>
                   {abertas.length ? (
-                    abertas.slice(0, 6).map((t) => <TaskRow key={`${t.id}-${t.status}-${t.titulo}`} task={t} clientes={todos ?? []} hoje={hoje} semCliente resumo={resumos[t.id]} />)
+                    <div className="@container">{abertas.slice(0, 6).map((t) => <TaskRow key={`${t.id}-${t.status}-${t.titulo}`} task={t} clientes={todos ?? []} hoje={hoje} semCliente resumo={resumos[t.id]} />)}</div>
                   ) : (
-                    <Empty>Nenhuma tarefa aberta pra esse cliente.</Empty>
+                    <Empty icon={<ListChecks size={20} strokeWidth={1.8} />}>Nenhuma tarefa aberta pra esse cliente.</Empty>
                   )}
                 </Card>
                 <Card title="Últimas cobranças" aside={<a href={`${base}?tab=cobrancas`} className="font-semibold text-brand">Ver todas</a>} flush>
@@ -355,7 +355,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                 })}
               </ul>
             ) : (
-              <Empty>Nenhum relatório ainda. Escolha o mês e crie o primeiro, com link pro cliente e PDF.</Empty>
+              <Empty icon={<FileBarChart size={20} strokeWidth={1.8} />}>Nenhum relatório ainda. Escolha o mês e crie o primeiro, com link pro cliente e PDF.</Empty>
             )}
           </Card>
         )}
@@ -424,7 +424,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                     </table>
                   </div>
                 ) : (
-                  <Empty>Nenhum número ainda. Coloque o ID das contas ao lado e conecte o Meta e o Google em Configurações &gt; Meta e Google.</Empty>
+                  <Empty icon={<BarChart3 size={20} strokeWidth={1.8} />}>Nenhum número ainda. Coloque o ID das contas ao lado e conecte o Meta e o Google em Configurações &gt; Meta e Google.</Empty>
                 )}
               </Card>
             </div>
