@@ -4,6 +4,8 @@ import { db, type Contract } from '@/lib/db';
 import { STATUS_CONTRATO, numeroContrato } from '@/lib/contrato';
 import { brl } from '@/lib/format';
 import { ExcluirContrato } from '@/components/excluir-contrato';
+import FormDialog, { Field } from '@/components/dialog';
+import { registrarContratoAssinadoFora } from '@/app/actions';
 import { Badge, Body, Card, Empty, Kpi, PageHeader, btn } from '@/components/ui';
 
 const quando = (iso: string) => new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Recife', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
@@ -32,6 +34,28 @@ export default async function ContratosPage() {
   return (
     <>
       <PageHeader title="Contratos" subtitle="Todos os contratos e o caminho até a assinatura">
+        <FormDialog label="Registrar contrato já assinado" title="Contrato assinado fora do sistema" action={registrarContratoAssinadoFora} submit="Registrar" variant="secondary">
+          <p className="text-[12.5px] text-muted">Pra quem já assinou contrato no papel ou em outro lugar (Autentique, Asaas...). Fica só o registro, sem mandar link.</p>
+          <Field label="Cliente *">
+            <select name="client_id" required className="field" defaultValue={semContrato[0]?.id ?? ''}>
+              <option value="" disabled>
+                Escolha o cliente
+              </option>
+              {clientes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                  {comContrato.has(c.id) ? ' (já tem contrato)' : ''}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Data da assinatura">
+            <input name="assinado_em" type="date" required className="field" />
+          </Field>
+          <Field label="Link do contrato assinado (opcional)">
+            <input name="link" type="url" placeholder="https://..." className="field" />
+          </Field>
+        </FormDialog>
         <Link href="/contratos/novo" className={btn.primary}>
           <Plus size={15} /> Novo contrato
         </Link>
@@ -58,7 +82,7 @@ export default async function ContratosPage() {
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13.5px] font-semibold">{nome}</span>
                           <span className="block text-[12px] text-muted">
-                            Nº {numeroContrato(c.numero)} · {c.status === 'assinado' && c.assinado_em ? `assinado em ${quando(c.assinado_em)}` : `criado em ${quando(c.created_at)}`}
+                            Nº {numeroContrato(c.numero)} · {c.status === 'assinado' && c.assinado_em ? `assinado${c.modelo?.externo ? ' fora do sistema' : ''} em ${quando(c.assinado_em)}` : `criado em ${quando(c.created_at)}`}
                           </span>
                         </span>
                         <span className="text-[13px] font-semibold tabular-nums">{brl(mensal(c))}/mês</span>

@@ -24,7 +24,7 @@ import { PRIORIDADE, STATUS } from '@/lib/tarefas';
 import { ESPERA, NICHO, normalizeWhatsapp, type Passo } from '@/lib/prospeccao';
 import { CONDICOES_PADRAO, INTRODUCAO_PADRAO, itemDoServico, plataformaDosItens, totais } from '@/lib/propostas';
 import { criarOnboarding } from '@/lib/modelos';
-import { clienteDoContrato, criarContrato, criarContratoNovo, lerEmpresa } from '@/lib/contratos';
+import { clienteDoContrato, criarContrato, criarContratoNovo, lerEmpresa, registrarContratoExterno } from '@/lib/contratos';
 import { clausulas, cpfValido, REDES, TIPOS } from '@/lib/contrato';
 import { chavesPush, enviarParaTodos, resumoDoDia } from '@/lib/push';
 import { somaDoMes } from '@/lib/anuncios';
@@ -791,6 +791,16 @@ export async function salvarContrato(id: string, form: FormData) {
     })
     .eq('id', id)
     .eq('status', 'aguardando');
+  refresh();
+}
+
+export async function registrarContratoAssinadoFora(form: FormData) {
+  await requireAuth();
+  const clientId = texto(form, 'client_id');
+  const dia = texto(form, 'assinado_em') ?? today();
+  const link = texto(form, 'link');
+  if (!clientId || !/^\d{4}-\d{2}-\d{2}$/.test(dia)) return;
+  await registrarContratoExterno(db(), clientId, dia, link && /^https?:\/\//.test(link) ? link.slice(0, 500) : null);
   refresh();
 }
 

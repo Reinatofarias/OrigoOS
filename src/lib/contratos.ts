@@ -101,3 +101,30 @@ export async function clienteDoContrato(supa: SupabaseClient, c: Contract, k: Co
   if (m.tipo === 'trafego') await criarOnboarding(supa, data as Client);
   return data as Client;
 }
+
+// Registra um contrato que o cliente já assinou fora do sistema, pra ele não aparecer como "sem contrato".
+export async function registrarContratoExterno(supa: SupabaseClient, clientId: string, assinadoEm: string, link: string | null) {
+  const { data } = await supa.from('clients').select('*').eq('id', clientId).maybeSingle();
+  if (!data) return null;
+  const c = data as Client;
+  const plataforma = c.plataforma === 'google_meta' ? 'Google e Meta Ads' : c.plataforma === 'meta' ? 'Meta Ads' : 'Google Ads';
+  const itens: ItemProposta[] = c.servicos?.length
+    ? c.servicos
+    : [{ service_id: null, nome: `Gestão de tráfego pago (${plataforma})`, descricao: null, valor: Number(c.mensalidade ?? 0), cobranca: 'mensal', plataforma: c.plataforma }];
+  const { data: novo } = await supa
+    .from('contracts')
+    .insert({
+      client_id: c.id,
+      itens,
+      desconto: 0,
+      dia_vencimento: c.dia_vencimento ?? 10,
+      modelo: { externo: true, link },
+      contratante: { nome: c.nome, documento: c.documento ?? '', endereco: c.endereco ?? '', email: c.email ?? '', telefone: c.telefone ?? '', representante: c.responsavel ?? '' },
+      status: 'assinado',
+      assinado_em: new Date(`${assinadoEm}T12:00:00-03:00`).toISOString(),
+      assinado_nome: c.responsavel ?? c.nome,
+    })
+    .select('id')
+    .single();
+  return (novo?.id as string) ?? null;
+}
