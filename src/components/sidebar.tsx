@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, Wallet, LogOut, Activity, Target, Settings } from 'lucide-react';
+import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, FileSignature, Wallet, LogOut, Activity, Target, Settings } from 'lucide-react';
 import { logout } from '@/app/actions';
 import { Logo } from './logo';
 
@@ -12,6 +12,8 @@ const LINKS = [
   { href: '/agenda', label: 'Agenda', icon: CalendarDays },
   { href: '/comercial', label: 'Comercial', icon: KanbanSquare },
   { href: '/clientes', label: 'Clientes', icon: Building2 },
+  // No celular, Contratos fica no ícone da barra de cima (a de baixo já tem 7 módulos).
+  { href: '/contratos', label: 'Contratos', icon: FileSignature, soComputador: true },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet },
   { href: '/metas', label: 'Metas', icon: Target },
 ];
@@ -74,6 +76,9 @@ export default function Sidebar() {
       <header className="sticky top-0 z-30 flex items-center justify-between bg-sidebar px-4 py-3 md:hidden">
         <Logo height={28} />
         <span className="flex items-center">
+        <Link href="/contratos" className="rounded-lg p-2 text-sidebar-ink" aria-label="Contratos">
+          <FileSignature size={18} />
+        </Link>
         <Link href="/configuracoes" className="rounded-lg p-2 text-sidebar-ink" aria-label="Configurações">
           <Settings size={18} />
         </Link>
@@ -88,7 +93,7 @@ export default function Sidebar() {
         className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         aria-label="Principal"
       >
-        {LINKS.map(({ href, label, icon: Icon }) => (
+        {LINKS.filter((l) => !('soComputador' in l)).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
