@@ -2,11 +2,13 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Circle, CircleCheck, CircleDot, Flag, MessageSquare, Plus, Send, Trash2, X } from 'lucide-react';
-import { deleteTask, updateTask } from '@/app/actions';
+import { Check, Circle, CircleCheck, CircleDot, Flag, MessageSquare, Plus, Repeat, Send, Trash2, X } from 'lucide-react';
+import { definirRepeticao, deleteTask, updateTask } from '@/app/actions';
 import { addComment, addItem, deleteComment, deleteItem, updateItem } from '@/app/acoes/tarefas';
 import type { Prioridade, Task, TaskComment, TaskItem, TaskStatus } from '@/lib/db';
 import { PRIORIDADE, STATUS } from '@/lib/tarefas';
+import { formatShort, today, weekday } from '@/lib/dates';
+import { proximaData, SEMANA, type Repeticao } from '@/lib/repeticao';
 import { btn } from '@/components/ui';
 import { avisar } from './toast';
 
@@ -40,7 +42,7 @@ export function TaskTitle({ task }: { task: Task }) {
         setTitulo(e.target.value.replace(/\n/g, ' '));
         ajustar(e.target);
       }}
-      onBlur={() => titulo.trim() && titulo !== task.titulo && start(() => updateTask(task.id, { titulo: titulo.trim() }))}
+      onBlur={() => titulo.trim() && titulo !== task.titulo && start(async () => { await updateTask(task.id, { titulo: titulo.trim() }); })}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -63,7 +65,13 @@ export function TaskStatusButtons({ task }: { task: Task }) {
             key={st}
             type="button"
             aria-pressed={task.status === st}
-            onClick={() => task.status !== st && start(() => updateTask(task.id, { status: st }))}
+            onClick={() =>
+              task.status !== st &&
+              start(async () => {
+                const proxima = await updateTask(task.id, { status: st });
+                if (proxima) avisar(`Feito! Próxima repetição em ${formatShort(proxima)}`);
+              })
+            }
             className="flex items-center gap-1.5 border-r border-line px-3 py-1.5 text-[12.5px] font-semibold text-muted last:border-r-0 hover:bg-surface-2 aria-pressed:text-white"
             style={task.status === st ? { background: STATUS[st].cor } : undefined}
           >
@@ -93,7 +101,9 @@ export function TaskStatusButtons({ task }: { task: Task }) {
 // Campos da lateral: prioridade, cliente e prazo.
 export function TaskFields({ task, clientes }: { task: Task; clientes: { id: string; nome: string }[] }) {
   const [pending, start] = useTransition();
-  const salvar = (campos: Parameters<typeof updateTask>[1]) => start(() => updateTask(task.id, campos));
+  const salvar = (campos: Parameters<typeof updateTask>[1]) => start(async () => {
+    await updateTask(task.id, campos);
+  });
   const linha = 'grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 py-1.5';
   return (
     <div className={`grid grid-cols-[minmax(0,1fr)] divide-y divide-line ${pending ? 'opacity-60' : ''}`}>
@@ -134,6 +144,141 @@ export function TaskFields({ task, clientes }: { task: Task; clientes: { id: str
           className="cell-input w-full text-[13.5px]"
         />
       </label>
+      <Repetir key={JSON.stringify(task.repeticao ?? null)} task={task} linha={linha} />
+    </div>
+  );
+}
+
+type Modo = '' | 'dia' | 'uteis' | 'semana' | 'quinzena' | 'mes' | 'outro';
+
+function modoDe(r: Repeticao | null | undefined): Modo {
+  if (!r) return '';
+  const dias = [...(r.dias_semana ?? [])].sort().join();
+  if (r.tipo === 'dias' && r.a_cada === 1) return 'dia';
+  if (r.tipo === 'semanas' && r.a_cada === 1) return dias === '1,2,3,4,5' ? 'uteis' : 'semana';
+  if (r.tipo === 'semanas' && r.a_cada === 2 && !dias) return 'quinzena';
+  if (r.tipo === 'meses' && r.a_cada === 1) return 'mes';
+  return 'outro';
+}
+
+// Repetir, como no ClickUp: ao concluir a tarefa, nasce a próxima com o novo prazo.
+function Repetir({ task, linha }: { task: Task; linha: string }) {
+  const [pending, start] = useTransition();
+  const [modo, setModo] = useState<Modo>(modoDe(task.repeticao));
+  const [n, setN] = useState(String(task.repeticao?.a_cada ?? 3));
+  const [unidade, setUnidade] = useState<Repeticao['tipo']>(task.repeticao?.tipo ?? 'dias');
+  const base = task.data ?? today();
+  const atual = task.repeticao ?? null;
+
+  const gravar = (r: Repeticao | null, aviso: string) =>
+    start(async () => {
+      const erro = await definirRepeticao(task.id, r);
+      avisar(erro ?? aviso, erro ? 'erro' : undefined);
+    });
+
+  const escolher = (m: Modo) => {
+    setModo(m);
+    if (m === 'outro') return;
+    const r: Repeticao | null =
+      m === 'dia'
+        ? { tipo: 'dias', a_cada: 1 }
+        : m === 'uteis'
+          ? { tipo: 'semanas', a_cada: 1, dias_semana: [1, 2, 3, 4, 5] }
+          : m === 'semana'
+            ? { tipo: 'semanas', a_cada: 1, dias_semana: [weekday(base)] }
+            : m === 'quinzena'
+              ? { tipo: 'semanas', a_cada: 2 }
+              : m === 'mes'
+                ? { tipo: 'meses', a_cada: 1, dia_mes: Number(base.slice(8, 10)) }
+                : null;
+    gravar(r, r ? 'Repetição salva' : 'Repetição removida');
+  };
+
+  const salvarOutro = (qtd = n, tipo = unidade) => {
+    const a_cada = Math.max(1, Math.min(365, Math.floor(Number(qtd)) || 1));
+    const r: Repeticao = tipo === 'meses' ? { tipo, a_cada, dia_mes: Number(base.slice(8, 10)) } : { tipo, a_cada };
+    if (atual && atual.tipo === r.tipo && atual.a_cada === r.a_cada && !atual.dias_semana?.length) return;
+    gravar(r, 'Repetição salva');
+  };
+
+  const alternarDia = (d: number) => {
+    const dias = atual?.dias_semana ?? [];
+    const novos = dias.includes(d) ? dias.filter((x) => x !== d) : [...dias, d].sort();
+    if (!novos.length) return;
+    gravar({ tipo: 'semanas', a_cada: 1, dias_semana: novos }, 'Repetição salva');
+  };
+
+  return (
+    <div className={`py-1.5 ${pending ? 'opacity-60' : ''}`}>
+      <label className={linha.replace('py-1.5', '')}>
+        <span className="flex items-center gap-1 text-[12.5px] text-muted">
+          <Repeat size={12} /> Repetir
+        </span>
+        <select value={modo} onChange={(e) => escolher(e.target.value as Modo)} className={`cell-input w-full text-[13.5px] ${modo ? '' : 'text-faint'}`}>
+          <option value="">Não repete</option>
+          <option value="dia">Todo dia</option>
+          <option value="uteis">Dias úteis (seg a sex)</option>
+          <option value="semana">Toda semana</option>
+          <option value="quinzena">A cada 2 semanas</option>
+          <option value="mes">Todo mês, no dia {Number(base.slice(8, 10))}</option>
+          <option value="outro">Personalizar…</option>
+        </select>
+      </label>
+
+      {modo === 'semana' && atual?.tipo === 'semanas' && (
+        <div className="mt-2 flex flex-wrap gap-1 pl-[104px]" role="group" aria-label="Dias da semana">
+          {SEMANA.map((nome, d) => (
+            <button
+              key={nome}
+              type="button"
+              aria-pressed={!!atual.dias_semana?.includes(d)}
+              onClick={() => alternarDia(d)}
+              className="rounded-md border border-line px-2 py-1 text-[12px] font-semibold text-muted hover:bg-surface-2 aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-white"
+            >
+              {nome}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {modo === 'outro' && (
+        <div className="mt-2 flex items-center gap-2 pl-[104px] text-[13px]">
+          <span className="text-muted">A cada</span>
+          <input
+            type="number"
+            min={1}
+            max={365}
+            inputMode="numeric"
+            aria-label="Quantidade"
+            value={n}
+            onChange={(e) => setN(e.target.value)}
+            onBlur={() => salvarOutro()}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            className="field w-16 px-2 py-1 text-center"
+          />
+          <select
+            aria-label="Unidade"
+            value={unidade}
+            onChange={(e) => {
+              const u = e.target.value as Repeticao['tipo'];
+              setUnidade(u);
+              salvarOutro(n, u);
+            }}
+            className="field w-auto px-2 py-1"
+          >
+            <option value="dias">dias</option>
+            <option value="semanas">semanas</option>
+            <option value="meses">meses</option>
+          </select>
+        </div>
+      )}
+
+      {atual && (
+        <p className="mt-1.5 pl-[104px] text-[12px] leading-snug text-muted">
+          Ao concluir, a próxima nasce para {formatShort(proximaData(atual, task.data))}
+          {task.data ? '.' : ', contando do dia em que concluir.'}
+        </p>
+      )}
     </div>
   );
 }

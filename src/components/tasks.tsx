@@ -2,10 +2,11 @@
 
 import { useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { CalendarDays, Circle, CircleCheck, CircleDot, Flag, Plus, Trash2, ChevronDown, X, ListChecks, MessageSquare, PanelRightOpen, PartyPopper } from 'lucide-react';
+import { CalendarDays, Circle, CircleCheck, CircleDot, Flag, Plus, Trash2, ChevronDown, X, ListChecks, MessageSquare, PanelRightOpen, PartyPopper, Repeat } from 'lucide-react';
 import { addTask, deleteTask, updateTask } from '@/app/actions';
 import type { Prioridade, Task, TaskStatus } from '@/lib/db';
-import { prazo } from '@/lib/dates';
+import { formatShort, prazo } from '@/lib/dates';
+import { descreverRepeticao } from '@/lib/repeticao';
 import { Empty } from './ui';
 import { PRIORIDADE, STATUS, type ResumoTarefa } from '@/lib/tarefas';
 import { avisar } from './toast';
@@ -82,7 +83,9 @@ export function TaskRow({
 }) {
   const [pending, start] = useTransition();
   const [titulo, setTitulo] = useState(task.titulo);
-  const salvar = (campos: Parameters<typeof updateTask>[1]) => start(() => updateTask(task.id, campos));
+  const salvar = (campos: Parameters<typeof updateTask>[1]) => start(async () => {
+    await updateTask(task.id, campos);
+  });
   const atrasada = !!task.data && task.data < hoje && task.status !== 'done';
   const cliente = clientes.find((c) => c.id === task.client_id);
 
@@ -92,7 +95,12 @@ export function TaskRow({
     >
       <button
         type="button"
-        onClick={() => salvar({ status: PROXIMO[task.status] })}
+        onClick={() =>
+          start(async () => {
+            const proxima = await updateTask(task.id, { status: PROXIMO[task.status] });
+            if (proxima) avisar(`Feito! Próxima repetição em ${formatShort(proxima)}`);
+          })
+        }
         title={`${STATUS[task.status].label}: clique para avançar`}
         aria-label={`Status: ${STATUS[task.status].label}. Avançar`}
         className="grid size-7 place-items-center rounded-md hover:bg-surface-2"
@@ -184,9 +192,14 @@ export function TaskRow({
 
 // Descrição, subtarefas e comentários, como os ícones do ClickUp ao lado do nome.
 function Indicadores({ task, resumo }: { task: Task; resumo?: ResumoTarefa }) {
-  if (!resumo?.itens && !resumo?.comentarios && !task.descricao) return null;
+  if (!resumo?.itens && !resumo?.comentarios && !task.descricao && !task.repeticao) return null;
   return (
     <Link href={`/tarefas/${task.id}`} className="flex shrink-0 items-center gap-2 px-1 text-[11.5px] text-muted hover:text-ink">
+      {task.repeticao && (
+        <span className="flex items-center text-brand" title={`Repete: ${descreverRepeticao(task.repeticao)}`} aria-label={`Repete: ${descreverRepeticao(task.repeticao)}`}>
+          <Repeat size={12} />
+        </span>
+      )}
       {!!resumo?.itens && (
         <span className={`flex items-center gap-0.5 ${resumo.feitos === resumo.itens ? 'text-success' : ''}`} title="Subtarefas feitas">
           <ListChecks size={13} /> {resumo.feitos}/{resumo.itens}
