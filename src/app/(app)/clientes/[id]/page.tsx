@@ -159,7 +159,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
                   )}
                 </Card>
                 <Card title="Últimas cobranças" aside={<a href={`${base}?tab=cobrancas`} className="font-semibold text-brand">Ver todas</a>} flush>
-                  <ChargeTable charges={cobrancas.slice(0, 4)} hoje={hoje} asaas={asaas} />
+                  <ChargeTable charges={cobrancas.slice(0, 4)} hoje={hoje} asaas={asaas} contatos={{ [id]: cliente }} />
                 </Card>
               </div>
               <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
@@ -317,7 +317,7 @@ export default async function ClientePage({ params, searchParams }: PageProps<'/
 
         {tab === 'cobrancas' && (
           <Card flush title="Cobranças" aside={`Recebido ${brl(recebido)} · Em aberto ${brl(emAberto)}`}>
-            <ChargeTable charges={cobrancas} hoje={hoje} asaas={asaas} />
+            <ChargeTable charges={cobrancas} hoje={hoje} asaas={asaas} contatos={{ [id]: cliente }} />
           </Card>
         )}
 

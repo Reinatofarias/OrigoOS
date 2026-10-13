@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, FileSignature, Wallet, LogOut, Activity, Target, Settings, LayoutGrid, X } from 'lucide-react';
+import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, FileSignature, Wallet, LogOut, Activity, Target, Settings, LayoutGrid, X, Search } from 'lucide-react';
 import { logout } from '@/app/actions';
 import { Logo } from './logo';
 import { EscolhaTema } from './tema';
+import { Busca } from './busca';
 
 const LINKS = [
   { href: '/', label: 'Início', icon: Home },
@@ -34,6 +35,7 @@ function ativo(path: string, href: string) {
 export default function Sidebar() {
   const path = usePathname();
   const [mais, setMais] = useState(false);
+  const [busca, setBusca] = useState(false);
   const maisAtivo = MAIS.some((l) => ativo(path, l.href));
   const item = 'flex min-w-0 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted transition aria-[current=page]:text-brand';
   return (
@@ -43,7 +45,16 @@ export default function Sidebar() {
         <div className="px-2">
           <Logo height={40} />
         </div>
-        <p className="mt-8 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-ink/60">Workspace</p>
+        <button
+          type="button"
+          onClick={() => setBusca(true)}
+          className="mt-6 flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-sidebar-ink transition hover:bg-white/[0.08] hover:text-white"
+        >
+          <Search size={15} />
+          <span className="flex-1 text-left">Buscar</span>
+          <kbd className="rounded border border-white/15 px-1.5 text-[10.5px]">Ctrl K</kbd>
+        </button>
+        <p className="mt-6 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-ink/60">Workspace</p>
         <nav className="mt-2 grid gap-0.5" aria-label="Principal">
           {LINKS.map(({ href, label, icon: Icon }) => (
             <Link
@@ -88,7 +99,11 @@ export default function Sidebar() {
       {/* Celular: barra de cima só com a marca; módulos na barra de baixo */}
       <header className="sticky top-0 z-30 flex items-center justify-between bg-sidebar px-4 py-3 md:hidden">
         <Logo height={28} />
+        <button type="button" onClick={() => setBusca(true)} className="rounded-lg p-2 text-sidebar-ink" aria-label="Buscar">
+          <Search size={19} />
+        </button>
       </header>
+      <Busca aberta={busca} setAberta={setBusca} />
 
       {mais && (
         <div className="fixed inset-0 z-[45] bg-[rgb(10_11_26/0.35)] backdrop-blur-[3px] md:hidden" onClick={() => setMais(false)}>

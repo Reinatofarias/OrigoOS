@@ -19,11 +19,12 @@ export default async function FinanceiroPage({ searchParams }: PageProps<'/finan
   const [{ data: ch, error }, { data: ex }, { data: cs }] = await Promise.all([
     supa.from('charges').select('*').gte('vencimento', start).lte('vencimento', end).order('vencimento'),
     supa.from('expenses').select('*').gte('data', start).lte('data', end).order('data'),
-    supa.from('clients').select('id, nome, ativo, mensalidade'),
+    supa.from('clients').select('id, nome, ativo, mensalidade, responsavel, telefone'),
   ]);
   const cobrancas = ((ch ?? []) as Charge[]).filter((c) => c.status !== 'cancelado');
   const despesas = (ex ?? []) as Expense[];
   const nomes = Object.fromEntries((cs ?? []).map((c) => [c.id, c.nome]));
+  const contatos = Object.fromEntries((cs ?? []).map((c) => [c.id, { nome: c.nome, responsavel: c.responsavel, telefone: c.telefone }]));
   const soma = (xs: { valor: number }[]) => xs.reduce((s, x) => s + Number(x.valor), 0);
 
   const previsto = soma(cobrancas);
@@ -79,7 +80,7 @@ export default async function FinanceiroPage({ searchParams }: PageProps<'/finan
         )}
 
         <Card flush title={`Cobranças de ${formatMonth(ym).toLowerCase()}`} aside={faltam > 0 ? `${faltam} cliente(s) sem mensalidade gerada` : 'Mensalidades geradas'}>
-          <ChargeTable charges={cobrancas} hoje={hoje} nomes={nomes} asaas={asaas} />
+          <ChargeTable charges={cobrancas} hoje={hoje} nomes={nomes} asaas={asaas} contatos={contatos} />
         </Card>
 
         <Card
