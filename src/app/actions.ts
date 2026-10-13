@@ -794,6 +794,16 @@ export async function salvarContrato(id: string, form: FormData) {
   refresh();
 }
 
+// Apaga o contrato de vez (teste ou erro). O link para de funcionar; o cliente continua cadastrado.
+export async function excluirContrato(id: string, voltarPraLista: boolean) {
+  await requireAuth();
+  const { error } = await db().from('contracts').delete().eq('id', id);
+  if (error) return { erro: `Não consegui excluir: ${error.message}` };
+  refresh();
+  if (voltarPraLista) redirect('/contratos');
+  return {};
+}
+
 export async function cancelarContrato(id: string) {
   await requireAuth();
   await db().from('contracts').update({ status: 'cancelado', updated_at: agora() }).eq('id', id);
