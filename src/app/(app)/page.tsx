@@ -12,6 +12,8 @@ import { NIVEL, saudeDosClientes } from '@/lib/saude';
 import ProspeccaoHoje from '@/components/prospeccao-hoje';
 import { Badge, Body, Card, Empty, Kpi } from '@/components/ui';
 import { TodayTasks } from '@/components/tasks';
+import { CobrarZap } from '@/components/cobrar-zap';
+import { FaleiHoje } from '@/components/falei-hoje';
 import { resumosDas } from '@/lib/tarefas';
 import RoutineToggle from '@/components/routine';
 import { listarEventos, situacaoAgenda, type Evento } from '@/lib/google-agenda';
@@ -54,6 +56,7 @@ export default async function InicioPage() {
   const novos = (nv ?? []) as Lead[];
   const cobrancas = (proximas ?? []) as Charge[];
   const nomes = Object.fromEntries(clientes.map((c) => [c.id, c.nome]));
+  const porId = Object.fromEntries(clientes.map((c) => [c.id, c]));
   const abertasHoje = todas.filter((t) => t.status !== 'done');
   const atrasadas = abertasHoje.filter((t) => t.data && t.data < hoje).length;
   const rotinaFeita = rotina.filter((t) => t.status === 'done').length;
@@ -157,6 +160,11 @@ export default async function InicioPage() {
                             </li>
                           ))}
                         </ul>
+                        {c.alertas.some((a) => /contato registrado|Sem contato há/.test(a.texto)) && (
+                          <div className="mt-1 pl-2.5">
+                            <FaleiHoje clientId={c.client_id} />
+                          </div>
+                        )}
                       </li>
                     ))}
                 </ul>
@@ -193,8 +201,8 @@ export default async function InicioPage() {
                   {cobrancas.map((c) => {
                     const s = situacao(c, hoje);
                     return (
-                      <li key={c.id}>
-                        <Link href={`/clientes/${c.client_id}?tab=cobrancas`} className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-surface-2/60">
+                      <li key={c.id} className="flex items-center gap-1 pr-2 hover:bg-surface-2/60">
+                        <Link href={`/clientes/${c.client_id}?tab=cobrancas`} className="flex min-w-0 flex-1 items-center justify-between gap-3 py-2.5 pl-4 pr-1">
                           <span className="min-w-0">
                             <span className="block truncate text-[13px] font-semibold">{nomes[c.client_id] ?? 'Cliente'}</span>
                             <span className={`block text-[12px] ${s === 'vencido' ? 'font-semibold text-danger' : 'text-muted'}`}>
@@ -203,6 +211,7 @@ export default async function InicioPage() {
                           </span>
                           <span className="text-[13px] font-semibold tabular-nums">{brl(c.valor)}</span>
                         </Link>
+                        {porId[c.client_id] && <CobrarZap c={c} cliente={porId[c.client_id]} hoje={hoje} compacto />}
                       </li>
                     );
                   })}

@@ -8,6 +8,8 @@ import type { Charge } from '@/lib/db';
 import { FORMA, SITUACAO, brl, situacao } from '@/lib/format';
 import { formatShort } from '@/lib/dates';
 import { Badge, Empty } from './ui';
+import { CobrarZap } from './cobrar-zap';
+import type { ContatoCliente } from '@/lib/cobranca-zap';
 
 function Fatura({ c }: { c: Charge }) {
   if (!c.asaas_url) return null;
@@ -18,7 +20,7 @@ function Fatura({ c }: { c: Charge }) {
   );
 }
 
-function Acoes({ c, asaas }: { c: Charge; asaas?: boolean }) {
+function Acoes({ c, asaas, contato, hoje }: { c: Charge; asaas?: boolean; contato?: ContatoCliente; hoje: string }) {
   const [forma, setForma] = useState<NonNullable<Charge['forma']>>('pix');
   const [pending, start] = useTransition();
   const emitir = () =>
@@ -40,6 +42,7 @@ function Acoes({ c, asaas }: { c: Charge; asaas?: boolean }) {
   return (
     <span className={`flex items-center justify-end gap-1 ${pending ? 'opacity-60' : ''}`}>
       <Fatura c={c} />
+      {contato && <CobrarZap c={c} cliente={contato} hoje={hoje} />}
       {asaas && !c.asaas_id && (
         <button type="button" onClick={emitir} title="Emitir a cobrança no Asaas (Pix, boleto ou cartão)" className="inline-flex items-center gap-1 rounded-md bg-info-soft px-2 py-1 text-[12px] font-semibold text-info hover:opacity-80">
           <Send size={12} /> Emitir
@@ -74,7 +77,7 @@ function Acoes({ c, asaas }: { c: Charge; asaas?: boolean }) {
   );
 }
 
-export function ChargeTable({ charges, hoje, nomes, asaas }: { charges: Charge[]; hoje: string; nomes?: Record<string, string>; asaas?: boolean }) {
+export function ChargeTable({ charges, hoje, nomes, asaas, contatos }: { charges: Charge[]; hoje: string; nomes?: Record<string, string>; asaas?: boolean; contatos?: Record<string, ContatoCliente> }) {
   if (!charges.length) return <Empty icon={<Wallet size={20} strokeWidth={1.8} />}>Nenhuma cobrança nesse período.</Empty>;
   return (
     <div className="overflow-x-auto">
@@ -110,7 +113,7 @@ export function ChargeTable({ charges, hoje, nomes, asaas }: { charges: Charge[]
                   {c.asaas_id && c.status === 'pendente' && <span className="ml-1.5 text-[11.5px] text-info">no Asaas</span>}
                 </td>
                 <td className="px-4 py-2.5">
-                  <Acoes c={c} asaas={asaas} />
+                  <Acoes c={c} asaas={asaas} contato={contatos?.[c.client_id]} hoje={hoje} />
                 </td>
               </tr>
             );
