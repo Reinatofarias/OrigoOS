@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Home, ListChecks, CalendarDays, KanbanSquare, Building2, FileSignature, Wallet, LogOut, Activity, Target, Settings, LayoutGrid, X } from 'lucide-react';
 import { logout } from '@/app/actions';
 import { Logo } from './logo';
+import { EscolhaTema } from './tema';
 
 const LINKS = [
   { href: '/', label: 'Início', icon: Home },
@@ -67,6 +68,7 @@ export default function Sidebar() {
               </div>
             </div>
           </div>
+          <EscolhaTema compacto escuro />
           <div className="grid">
             <Link href="/configuracoes" aria-current={ativo(path, '/configuracoes') ? 'page' : undefined} className="flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-sidebar-ink hover:bg-sidebar-hover hover:text-white aria-[current=page]:text-white">
               <Settings size={16} /> Configurações
@@ -113,6 +115,9 @@ export default function Sidebar() {
                   Sair
                 </button>
               </form>
+            </div>
+            <div className="mt-2 border-t border-line/60 px-1 pt-2">
+              <EscolhaTema />
             </div>
           </div>
         </div>

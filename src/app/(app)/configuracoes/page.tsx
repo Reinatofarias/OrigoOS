@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 import { db, type Service, type TaskTemplate } from '@/lib/db';
 import { asaasAmbiente, asaasConfigurado } from '@/lib/asaas';
 import { Body, Card, PageHeader, Tabs } from '@/components/ui';
+import { EscolhaTema } from '@/components/tema';
 import FormDialog, { Field } from '@/components/dialog';
 import { ServiceRow, TemplateRow } from '@/components/config';
 import { PRIORIDADE } from '@/components/tasks';
@@ -25,7 +26,7 @@ import { sairDeTodos } from '@/app/acoes/seguranca';
 import { SairDeTodos } from '@/components/sair-todos';
 import { btn } from '@/components/ui';
 
-const TABS = ['servicos', 'onboarding', 'rotina', 'empresa', 'mensagens', 'integracoes', 'app', 'asaas', 'seguranca'] as const;
+const TABS = ['servicos', 'onboarding', 'rotina', 'empresa', 'mensagens', 'integracoes', 'app', 'aparencia', 'asaas', 'seguranca'] as const;
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 function Cabecalho({ cols, nomes }: { cols: string; nomes: string[] }) {
@@ -177,6 +178,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
             { key: 'mensagens', label: 'Mensagens e site', href: '/configuracoes?tab=mensagens' },
             { key: 'integracoes', label: 'Integrações', href: '/configuracoes?tab=integracoes' },
             { key: 'app', label: 'Notificações', href: '/configuracoes?tab=app' },
+            { key: 'aparencia', label: 'Aparência', href: '/configuracoes?tab=aparencia' },
             { key: 'asaas', label: 'Asaas', href: '/configuracoes?tab=asaas' },
             { key: 'seguranca', label: 'Segurança', href: '/configuracoes?tab=seguranca' },
           ]}
@@ -286,6 +288,15 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
               </div>
             </form>
           </Card>
+        )}
+
+        {tab === 'aparencia' && (
+          <div className="max-w-xl">
+            <Card title="Aparência">
+              <p className="mb-3 text-[13px] text-muted">Automático segue o modo claro ou escuro do aparelho. A escolha fica salva em cada aparelho (celular e computador separados).</p>
+              <EscolhaTema />
+            </Card>
+          </div>
         )}
 
         {tab === 'app' && (
