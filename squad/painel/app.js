@@ -134,7 +134,8 @@ function desenharMotores() {
       const ligado = estado.config?.[m]?.ativo !== false;
       const classe = ligado ? s.estado : "desligado";
       let texto = ligado ? ESTADO_MOTOR[s.estado] || s.estado : "desligado";
-      if (ligado && s.estado === "pausado" && s.ate) texto = `em pausa até ${new Date(s.ate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+      if (ligado && s.estado === "pausado" && /não encontrado/.test(s.motivo || "")) texto = "não encontrado";
+      else if (ligado && s.estado === "pausado" && s.ate) texto = `em pausa até ${new Date(s.ate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
       return `<span class="pilula ${classe}" title="${esc(s.motivo || "")}"><i></i>${esc(estado.nomesMotores[m] || m)}: ${esc(texto)}</span>`;
     })
     .join("");
@@ -413,20 +414,37 @@ document.addEventListener("click", async (e) => {
 
 // ---------- configurações ----------
 function campos() {
-  return [...$("#formConfig").querySelectorAll("input[name]")];
+  return [...$("#formConfig").querySelectorAll("input[name], select[name]")];
+}
+function opcoesModelo(select, modelos, atual, rotuloVazio) {
+  const lista = [...new Set([...(rotuloVazio ? [""] : []), "auto", ...modelos, ...(atual ? [atual] : [])])];
+  select.innerHTML = lista.map((m) => `<option value="${esc(m)}">${esc(m === "" ? rotuloVazio : m === "auto" ? "auto (o OmniRoute escolhe)" : m)}</option>`).join("");
+  select.value = atual ?? "";
+}
+function preencherModelos(modelos) {
+  const c = estado.config;
+  opcoesModelo($("#formConfig [name='omniroute.modelo']"), modelos, c.omniroute?.modelo || "auto");
+  const padrao = c.omniroute?.modelo || "auto";
+  $("#modelosAgentes").innerHTML = estado.agentes
+    .map((a) => `<span style="color:${esc(a.cor)}">${esc(a.nome)}</span><select name="agentes.${esc(a.id)}.modelo"></select>`)
+    .join("");
+  for (const a of estado.agentes) {
+    opcoesModelo($(`#formConfig [name='agentes.${a.id}.modelo']`), modelos, c.agentes?.[a.id]?.modelo || "", `Padrão (${padrao})`);
+  }
 }
 async function abrirConfig() {
   const c = estado.config;
+  preencherModelos([]);
   for (const campo of campos()) {
     const valor = campo.name.split(".").reduce((o, k) => o?.[k], c);
     if (campo.type === "checkbox") campo.checked = valor !== false;
-    else campo.value = valor ?? "";
+    else if (campo.tagName !== "SELECT" || valor) campo.value = valor ?? "";
   }
   $("#janelaConfig").showModal();
   const status = $("#statusOmniroute");
   status.textContent = "Procurando modelos no OmniRoute…";
   const r = await api("/api/omniroute/modelos").catch((e) => ({ modelos: [], erro: e.message }));
-  $("#modelosOmniroute").innerHTML = ["auto", ...r.modelos].map((m) => `<option value="${esc(m)}">`).join("");
+  preencherModelos(r.modelos);
   status.textContent = r.modelos.length
     ? `${r.modelos.length} modelos encontrados no OmniRoute.`
     : `Não achei o OmniRoute (${r.erro || "sem modelos"}). Confira se ele está aberto e se a chave está no arquivo .env.`;

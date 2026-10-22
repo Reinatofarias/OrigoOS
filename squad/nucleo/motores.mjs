@@ -68,7 +68,8 @@ async function rodarOmniroute({ agente, sistema, tarefa, config, avisar, sinal }
     apiKey: process.env.OMNIROUTE_KEY || "sem-chave",
     maxRetries: 1,
   });
-  const modelo = agente.modeloOmniroute || config.omniroute.modelo || "auto";
+  // Painel > arquivo do agente > modelo padrão do OmniRoute
+  const modelo = config.agentes?.[agente.id]?.modelo || agente.modeloOmniroute || config.omniroute.modelo || "auto";
   avisar({ tipo: "status", texto: `Pensando com ${modelo} (OmniRoute)` });
   let texto = "";
   let usado = modelo;
@@ -239,4 +240,16 @@ export async function listarModelosOmniroute(config) {
   const lista = [];
   for await (const m of cliente.models.list()) lista.push(m.id);
   return lista.sort();
+}
+
+// Confere de tempos em tempos se o OmniRoute está aberto, para o painel mostrar a verdade
+// e o squad nem tentar usá-lo enquanto ele estiver fechado.
+export async function verificarOmniroute(config) {
+  if (config.omniroute?.ativo === false) return;
+  try {
+    await listarModelosOmniroute(config);
+    if (saude.omniroute.estado !== "ok") marcar("omniroute", { estado: "ok" });
+  } catch {
+    marcar("omniroute", { estado: "pausado", ate: Date.now() + 70_000, motivo: `OmniRoute não encontrado em ${config.omniroute.url}` });
+  }
 }

@@ -13,6 +13,8 @@ export const PADRAO = {
   omniroute: { ativo: true, url: "http://localhost:20128/v1", modelo: "auto" },
   claude: { ativo: true, modelo: "" },
   codex: { ativo: true, modelo: "" },
+  // Modelo do OmniRoute escolhido no painel para cada agente: { prospector: { modelo: "..." } }
+  agentes: {},
 };
 
 // Lê squad/.env (CHAVE=valor por linha) sem sobrescrever o que já está no ambiente.
@@ -59,7 +61,7 @@ function arquivosMd(pasta, base = pasta) {
     if (item.name.startsWith(".")) continue;
     const completo = path.join(pasta, item.name);
     if (item.isDirectory()) saida.push(...arquivosMd(completo, base));
-    else if (item.name.endsWith(".md") && !item.name.endsWith(".exemplo.md")) saida.push(completo);
+    else if (/\.md$/i.test(item.name) && !/\.exemplo\.md$/i.test(item.name)) saida.push(completo);
   }
   return saida.sort();
 }
