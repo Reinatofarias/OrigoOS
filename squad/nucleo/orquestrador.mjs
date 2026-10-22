@@ -7,6 +7,7 @@ import { DADOS, ENTREGAS } from "./caminhos.mjs";
 import { carregarAgentes, especialistas } from "./agentes.mjs";
 import { lerConfig, lerContexto } from "./config.mjs";
 import { rodarAgente } from "./motores.mjs";
+import { origoConectado, lerContextoOrigo, instrucaoOrigo, separarBloco, enviarParaOrigo } from "./origoos.mjs";
 
 export const eventos = new EventEmitter();
 eventos.setMaxListeners(50);
@@ -58,12 +59,16 @@ export function pararMissao(id) {
   ativas.get(id)?.abort();
 }
 
-function sistemaDe(agente, contexto) {
+// origo: dados ao vivo do Origo OS (ou null quando o squad não está conectado).
+function sistemaDe(agente, contexto, origo) {
   const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Recife" });
+  const verLeads = agente.id === "coordenador" || agente.origoOs === "leads";
   return [
     agente.instrucoes,
     `Hoje é ${hoje}.`,
     contexto ? `# Contexto da Origo Company\n\n${contexto}` : "",
+    origo ? (verLeads ? origo.comLeads : origo.geral) : "",
+    origo ? instrucaoOrigo(agente.origoOs) : "",
     "Responda sempre em português do Brasil.",
   ]
     .filter(Boolean)
@@ -104,7 +109,7 @@ Responda SOMENTE com um JSON neste formato:
 
 function pedidoDeResumo(texto, tarefas) {
   const partes = tarefas
-    .map((t) => `## ${t.nome}\nTarefa: ${t.tarefa}\n\n${t.status === "concluida" ? (t.resultado || "").slice(0, 8000) : `Não concluiu: ${t.erro}`}`)
+    .map((t) => `## ${t.nome}\nTarefa: ${t.tarefa}\n\n${t.status === "concluida" ? (t.resultado || "").slice(0, 8000) : `Não concluiu: ${t.erro}`}${t.origo ? `\n\n${t.origo}` : ""}`)
     .join("\n\n");
   return `O Renato pediu:\n"""${texto}"""\n\nO time entregou:\n\n${partes}\n\nEscreva para o Renato uma resposta curta (até 12 linhas): o que foi feito, o principal de cada entrega e o próximo passo que ele deve dar. Não repita as entregas inteiras, elas já estão salvas em arquivos.`;
 }
@@ -118,6 +123,40 @@ async function emLotes(itens, limite, fn) {
     }
   });
   await Promise.all(trabalhadores);
+}
+
+// Manda leads e tarefas do agente para o Origo OS e devolve uma frase do que aconteceu.
+async function mandarProOrigo(pacote, agenteId, emitir) {
+  const qtd = [pacote.leads.length ? `${pacote.leads.length} lead(s)` : "", pacote.tarefas.length ? `${pacote.tarefas.length} tarefa(s)` : ""].filter(Boolean).join(" e ");
+  if (!origoConectado()) {
+    const frase = `Preparei ${qtd} para o Origo OS, mas o squad não está conectado (falta ORIGO_OS_URL e ORIGO_OS_TOKEN no .env).`;
+    emitir({ agente: agenteId, tipo: "troca", texto: frase });
+    return frase;
+  }
+  emitir({ agente: agenteId, tipo: "ferramenta", texto: `Enviando ${qtd} para o Origo OS` });
+  try {
+    const r = await enviarParaOrigo(pacote);
+    const partes = [];
+    if (pacote.leads.length) partes.push(`${r.leadsCriados} lead(s) novo(s) no funil`);
+    if (r.leadsRepetidos?.length) partes.push(`${r.leadsRepetidos.length} já existia(m) (${r.leadsRepetidos.join(", ")})`);
+    if (r.leadsSemContato?.length) partes.push(`${r.leadsSemContato.length} sem WhatsApp/Instagram ficaram de fora (${r.leadsSemContato.join(", ")})`);
+    if (pacote.tarefas.length) partes.push(`${r.tarefasCriadas} tarefa(s) criada(s)`);
+    const frase = `Origo OS: ${partes.join("; ")}.`;
+    emitir({ agente: agenteId, tipo: "status", texto: frase });
+    return frase;
+  } catch (erro) {
+    const frase = `Não consegui enviar ${qtd} para o Origo OS (${erro?.message || erro}). O bloco ficou em dados/pendentes-origo.`;
+    guardarPendente(pacote);
+    emitir({ agente: agenteId, tipo: "erro", texto: frase });
+    return frase;
+  }
+}
+
+// Se o Origo OS estiver fora do ar, nada se perde: o pacote fica salvo para mandar depois.
+function guardarPendente(pacote) {
+  const pasta = path.join(DADOS, "pendentes-origo");
+  fs.mkdirSync(pasta, { recursive: true });
+  fs.writeFileSync(path.join(pasta, `${Date.now()}.json`), JSON.stringify(pacote, null, 2));
 }
 
 export function criarMissao(texto, { motor = "auto" } = {}) {
@@ -159,6 +198,18 @@ async function executar(missao) {
   };
 
   try {
+    // 0) Dados ao vivo do Origo OS (clientes, leads e tarefas), se o squad estiver conectado
+    let origo = null;
+    if (origoConectado()) {
+      try {
+        origo = await lerContextoOrigo();
+        const { clientes, leads, tarefas } = origo.totais;
+        emitir({ agente: "coordenador", tipo: "status", texto: `Li o Origo OS: ${clientes} cliente(s), ${leads} lead(s), ${tarefas} tarefa(s) em aberto` });
+      } catch (erro) {
+        emitir({ agente: "coordenador", tipo: "troca", texto: `Não consegui ler o Origo OS (${erro?.message || erro}). Sigo sem os dados de lá.` });
+      }
+    }
+
     // 1) Coordenador planeja
     emitir({ agente: "coordenador", tipo: "inicio", texto: "Recebi o pedido e estou planejando" });
     const historico = listarMissoes()
@@ -166,7 +217,7 @@ async function executar(missao) {
       .slice(0, 3);
     const plano = await rodarAgente({
       agente: agentes.coordenador,
-      sistema: sistemaDe(agentes.coordenador, contexto),
+      sistema: sistemaDe(agentes.coordenador, contexto, origo),
       tarefa: pedidoDePlano(missao.texto, time, historico),
       config,
       forcar: missao.motor,
@@ -201,18 +252,21 @@ async function executar(missao) {
         try {
           const r = await rodarAgente({
             agente: agentes[t.agente],
-            sistema: sistemaDe(agentes[t.agente], contexto),
+            sistema: sistemaDe(agentes[t.agente], contexto, origo),
             tarefa: t.tarefa,
             config,
             forcar: missao.motor,
             avisar: avisoDe(t.agente),
             sinal: controle.signal,
           });
-          t.resultado = r.texto;
+          const { texto, pacote } = separarBloco(r.texto);
+          t.resultado = texto;
           t.motor = r.motor;
           t.modelo = r.modelo;
           t.arquivo = path.join(missao.pasta, `${t.agente}.md`);
-          fs.writeFileSync(path.join(ENTREGAS, t.arquivo), `# ${t.nome}\n\n> ${t.tarefa}\n\n${r.texto}\n`);
+          if (pacote) t.origo = await mandarProOrigo(pacote, t.agente, emitir);
+          const rodape = t.origo ? `\n\n---\n${t.origo}\n` : "\n";
+          fs.writeFileSync(path.join(ENTREGAS, t.arquivo), `# ${t.nome}\n\n> ${t.tarefa}\n\n${texto}${rodape}`);
           t.status = "concluida";
           emitir({ agente: t.agente, tipo: "fim", motor: r.motor, texto: `Entrega salva (${r.modelo})` });
         } catch (erro) {
@@ -230,7 +284,7 @@ async function executar(missao) {
       emitir({ agente: "coordenador", tipo: "inicio", texto: "Juntando as entregas do time" });
       const resumo = await rodarAgente({
         agente: agentes.coordenador,
-        sistema: sistemaDe(agentes.coordenador, contexto),
+        sistema: sistemaDe(agentes.coordenador, contexto, origo),
         tarefa: pedidoDeResumo(missao.texto, missao.tarefas),
         config,
         forcar: missao.motor,

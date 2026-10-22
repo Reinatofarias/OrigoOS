@@ -26,6 +26,7 @@ import { restaurarMensagens, salvarMensagens } from '@/app/acoes/prospeccao';
 import { sairDeTodos } from '@/app/acoes/seguranca';
 import { SairDeTodos } from '@/components/sair-todos';
 import { btn } from '@/components/ui';
+import { tokenSquad } from '@/lib/squad';
 
 const TABS = ['servicos', 'onboarding', 'rotina', 'empresa', 'mensagens', 'integracoes', 'app', 'aparencia', 'asaas', 'seguranca'] as const;
 const DIAS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -149,6 +150,7 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
   const backup = tab === 'seguranca' ? ((await ler('backup_ultimo')) as { em: string; arquivo: string } | null) : null;
   const google = tab === 'integracoes' ? { token: await tokenGoogle(supa), ultimo: (await ler('google_ultimo')) as { em: string; dias: number; sem_cliente: string[] } | null } : null;
   const agenda = tab === 'integracoes' ? await situacaoAgenda(supa) : null;
+  const squad = tab === 'integracoes' ? { token: await tokenSquad(supa), ultimo: (await ler('squad_ultimo')) as { em: string; leadsCriados?: number; tarefasCriadas?: number } | null } : null;
   const avisoAgenda = typeof sp.agenda === 'string' ? AVISOS_AGENDA[sp.agenda] : undefined;
   const avisos =
     tab === 'app'
@@ -522,6 +524,28 @@ export default async function ConfiguracoesPage({ searchParams }: PageProps<'/co
                     </div>
                   </details>
                 </div>
+              </Card>
+            )}
+            {squad && (
+              <Card title="Origo Squad" className="lg:col-span-2">
+                <ul className="grid gap-2 text-[13.5px]">
+                  <Item ok={!!squad.ultimo}>
+                    {squad.ultimo
+                      ? `Último contato do squad: ${quando(squad.ultimo.em)}${squad.ultimo.leadsCriados !== undefined ? ` (${squad.ultimo.leadsCriados} lead(s), ${squad.ultimo.tarefasCriadas ?? 0} tarefa(s))` : ''}`
+                      : 'O squad ainda não conversou com o Origo OS'}
+                  </Item>
+                </ul>
+                <p className="mt-3 text-[13px] leading-relaxed">
+                  Os agentes que rodam no seu computador leem clientes, leads e tarefas daqui (pra não repetir nada) e mandam pra cá os leads que o Prospector achar e as tarefas que o Secretário e o Atendimento criarem. Na pasta do squad, abra o arquivo <code className="rounded bg-surface-2 px-1">.env</code> e cole estas duas linhas:
+                </p>
+                <textarea
+                  readOnly
+                  rows={2}
+                  value={`ORIGO_OS_URL=${origem}/api/squad\nORIGO_OS_TOKEN=${squad.token}`}
+                  className="field mt-3 font-mono text-[12px]"
+                  aria-label="Linhas para o .env do squad"
+                />
+                <p className="mt-2 text-[12px] text-muted">Depois feche e abra o squad de novo. Esse token é a senha do squad: só no .env do seu computador, nunca no chat nem no GitHub.</p>
               </Card>
             )}
             <Card title="Meta Ads">

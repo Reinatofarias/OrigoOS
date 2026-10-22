@@ -49,6 +49,23 @@ Para desligar, feche a janela preta.
 Em qualquer uma das duas, cole a chave no arquivo `squad\.env`, na linha `OMNIROUTE_KEY=`.
 No painel do squad, em **Configurações**, a lista de modelos do OmniRoute aparece sozinha.
 
+## Conexão com o Origo OS
+
+A parte comercial (clientes, funil de leads e tarefas) fica no Origo OS, na Vercel. O squad roda aqui e conversa com ele:
+
+- No começo de cada missão, o squad lê os clientes ativos, os leads do funil e as tarefas em aberto. Assim o Prospector não traz lead repetido e o Secretário não cria tarefa duplicada.
+- O **Prospector** manda os leads novos direto para o funil de prospecção, com status "novo" e origem "squad". Lead sem WhatsApp e sem Instagram fica de fora.
+- O **Secretário** e o **Atendimento** mandam as tarefas para a tela de Tarefas.
+- O painel mostra no feed o que foi enviado. Se o Origo OS estiver fora do ar, o pacote fica salvo em `dados\pendentes-origo\`.
+
+Para ligar (uma vez só):
+
+1. No Origo OS, abra **Configurações > Integrações > Origo Squad** e copie as duas linhas.
+2. Cole as duas no arquivo `squad\.env` (no lugar de `ORIGO_OS_URL=` e `ORIGO_OS_TOKEN=`).
+3. Feche e abra o squad de novo.
+
+O token é a senha do squad: fica só no `.env`, nunca no chat nem no GitHub. Os agentes operacionais (Conteúdo, Tráfego) continuam trabalhando só aqui. Para um agente novo mandar coisas, use `origo_os: leads` ou `origo_os: tarefas` no cabeçalho dele.
+
 ## Onde ficam as coisas
 
 | Pasta / arquivo | O que é |
