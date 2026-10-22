@@ -6,7 +6,7 @@ import { exec } from "node:child_process";
 import { RAIZ, ENTREGAS } from "./nucleo/caminhos.mjs";
 import { carregarEnv, lerConfig, salvarConfig } from "./nucleo/config.mjs";
 import { carregarAgentes } from "./nucleo/agentes.mjs";
-import { saudeMotores, observarSaude, listarModelosOmniroute, NOMES } from "./nucleo/motores.mjs";
+import { saudeMotores, observarSaude, listarModelosOmniroute, verificarOmniroute, NOMES } from "./nucleo/motores.mjs";
 import { eventos, criarMissao, listarMissoes, lerMissao, pararMissao } from "./nucleo/orquestrador.mjs";
 
 carregarEnv();
@@ -91,8 +91,8 @@ const servidor = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
     if (url.pathname === "/api/config" && req.method === "POST") {
-      const { paralelo, conhecimento, omniroute, claude, codex } = await corpo(req);
-      return json(res, 200, salvarConfig({ paralelo, conhecimento, omniroute, claude, codex }));
+      const { paralelo, conhecimento, omniroute, claude, codex, agentes } = await corpo(req);
+      return json(res, 200, salvarConfig({ paralelo, conhecimento, omniroute, claude, codex, agentes }));
     }
     if (url.pathname === "/api/omniroute/modelos") {
       try {
@@ -114,6 +114,9 @@ const servidor = http.createServer(async (req, res) => {
     json(res, 500, { erro: erro?.message || String(erro) });
   }
 });
+
+verificarOmniroute(lerConfig());
+setInterval(() => verificarOmniroute(lerConfig()), 60_000);
 
 // Só no próprio computador: ninguém da rede acessa o painel.
 servidor.listen(PORTA, "127.0.0.1", () => {

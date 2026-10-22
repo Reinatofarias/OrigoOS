@@ -95,17 +95,27 @@
       <fieldset>
         <legend><label><input type="checkbox" name="omniroute.ativo" /> OmniRoute</label></legend>
         <label>Endereço <input name="omniroute.url" placeholder="http://localhost:20128/v1" /></label>
-        <label>Modelo padrão <input name="omniroute.modelo" list="modelosOmniroute" placeholder="auto" /></label>
-        <datalist id="modelosOmniroute"></datalist>
+        <label>Modelo padrão <select name="omniroute.modelo" data-modelos="padrao"></select></label>
         <small id="statusOmniroute" class="dica"></small>
       </fieldset>
       <fieldset>
         <legend><label><input type="checkbox" name="claude.ativo" /> Claude (login do Claude Code)</label></legend>
-        <label>Modelo <input name="claude.modelo" placeholder="padrão do seu plano (ex.: sonnet, opus)" /></label>
+        <label>Modelo
+          <select name="claude.modelo">
+            <option value="">Padrão do seu plano</option>
+            <option value="sonnet">Sonnet (mais rápido, gasta menos limite)</option>
+            <option value="opus">Opus (mais inteligente, gasta mais limite)</option>
+            <option value="haiku">Haiku (o mais leve)</option>
+          </select>
+        </label>
       </fieldset>
       <fieldset>
         <legend><label><input type="checkbox" name="codex.ativo" /> Codex (login do Codex)</label></legend>
         <label>Modelo <input name="codex.modelo" placeholder="padrão do seu plano" /></label>
+      </fieldset>
+      <fieldset>
+        <legend>Modelo de cada agente no OmniRoute</legend>
+        <div id="modelosAgentes" class="modelosAgentes"></div>
       </fieldset>
       <label class="solto">Pasta de conhecimento (pode ser seu cofre do Obsidian) <input name="conhecimento" placeholder="vazio = pasta contexto do squad. Ex.: C:\Users\Renato\Documents\Obsidian\Origo" /></label>
       <label class="solto">Agentes trabalhando ao mesmo tempo <input name="paralelo" type="number" min="1" max="6" /></label>

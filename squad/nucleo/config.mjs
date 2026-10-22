@@ -13,6 +13,8 @@ export const PADRAO = {
   omniroute: { ativo: true, url: "http://localhost:20128/v1", modelo: "auto" },
   claude: { ativo: true, modelo: "" },
   codex: { ativo: true, modelo: "" },
+  // Modelo do OmniRoute escolhido no painel para cada agente: { prospector: { modelo: "..." } }
+  agentes: {},
 };
 
 // Lê squad/.env (CHAVE=valor por linha) sem sobrescrever o que já está no ambiente.

@@ -179,7 +179,7 @@ textarea { resize: vertical; min-height: 96px; }
 /* Janelas */
 .janela {
   width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--line); border-radius: var(--raio);
-  background: var(--surface); color: var(--ink); padding: 18px;
+  background: var(--surface); color: var(--ink); padding: 18px; overflow-y: auto;
 }
 .janela::backdrop { background: rgba(3, 4, 14, .7); backdrop-filter: blur(3px); }
 #janelaConfig { width: min(520px, calc(100vw - 32px)); }
@@ -188,6 +188,9 @@ textarea { resize: vertical; min-height: 96px; }
 #formConfig legend { padding: 0 6px; font-weight: 600; }
 #formConfig label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
 #formConfig legend label { flex-direction: row; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; }
+.modelosAgentes { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; }
+.modelosAgentes span { font-size: 13px; color: var(--ink); }
+.modelosAgentes select { font-size: 13px; padding: 8px 10px; }
 #formConfig input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--violet); }
 .nota { margin: 0; color: var(--muted); font-size: 13px; }
 
