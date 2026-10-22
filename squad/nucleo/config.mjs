@@ -59,7 +59,7 @@ function arquivosMd(pasta, base = pasta) {
     if (item.name.startsWith(".")) continue;
     const completo = path.join(pasta, item.name);
     if (item.isDirectory()) saida.push(...arquivosMd(completo, base));
-    else if (item.name.endsWith(".md") && !item.name.endsWith(".exemplo.md")) saida.push(completo);
+    else if (/\.md$/i.test(item.name) && !/\.exemplo\.md$/i.test(item.name)) saida.push(completo);
   }
   return saida.sort();
 }
