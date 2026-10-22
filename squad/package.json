@@ -1,0 +1,18 @@
+{
+  "name": "origo-squad",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Squad de agentes da Origo Company: coordenador + especialistas, com painel visual local.",
+  "type": "module",
+  "scripts": {
+    "start": "node servidor.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.308",
+    "@openai/codex-sdk": "^0.163.0",
+    "openai": "^7.42.0"
+  }
+}
