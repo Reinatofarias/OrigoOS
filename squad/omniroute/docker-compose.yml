@@ -1,0 +1,51 @@
+# OmniRoute no Docker, só no seu computador (127.0.0.1), com chave obrigatória.
+# Baseado no docker-compose.selfhost.yml oficial: github.com/diegosouzapw/OmniRoute
+#
+#   1) copie .env.exemplo para .env nesta pasta e troque a senha
+#   2) docker compose up -d
+#   3) abra http://127.0.0.1:20128, conecte seus provedores e crie uma chave em Endpoints
+#   4) cole a chave em OMNIROUTE_KEY no squad/.env
+
+services:
+  redis:
+    image: docker.io/library/redis:8.6.5-alpine
+    container_name: omniroute-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  omniroute:
+    image: diegosouzapw/omniroute:latest
+    container_name: omniroute
+    restart: unless-stopped
+    stop_grace_period: 40s
+    env_file: .env
+    environment:
+      - DATA_DIR=/app/data
+      - REDIS_URL=redis://redis:6379
+      - REQUIRE_API_KEY=true
+      - OMNIROUTE_MEMORY_MB=2048
+    ports:
+      - "127.0.0.1:20128:20128"
+      - "127.0.0.1:20129:20129"
+      - "127.0.0.1:20132:20132"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  redis-data:

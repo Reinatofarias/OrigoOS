@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Squad de agentes: app local separado, com package.json próprio.
+    "squad/**",
   ]),
 ]);
 

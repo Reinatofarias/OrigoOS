@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Origo Squad</title>
+  <link rel="icon" href="icone.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="estilo.css" />
+</head>
+<body>
+  <header class="topo">
+    <div class="marca">
+      <img src="marca.png" alt="" />
+      <div>
+        <strong>Origo <span class="grad">Squad</span></strong>
+        <small>Seu time de agentes</small>
+      </div>
+    </div>
+    <div class="motores" id="motores"></div>
+    <button class="botao fantasma" id="abrirConfig" type="button">Configurações</button>
+  </header>
+
+  <main class="grade">
+    <aside class="coluna esquerda">
+      <form class="cartao comando" id="formComando">
+        <label for="texto">O que o time faz agora?</label>
+        <textarea id="texto" rows="4" placeholder="Ex.: Me traz 10 leads de clínicas odontológicas em Paulista com WhatsApp e escreve a primeira mensagem"></textarea>
+        <div class="linha">
+          <select id="motor" title="Qual IA usar">
+            <option value="auto">IA automática</option>
+            <option value="omniroute">Só OmniRoute</option>
+            <option value="claude">Só Claude</option>
+            <option value="codex">Só Codex</option>
+          </select>
+          <button class="botao principal" type="submit">Enviar</button>
+        </div>
+        <small class="dica">Ctrl + Enter envia</small>
+      </form>
+      <div class="cartao historico">
+        <h2>Missões</h2>
+        <ul id="listaMissoes"></ul>
+      </div>
+    </aside>
+
+    <section class="coluna centro">
+      <div class="cartao fluxo">
+        <div class="cabeca">
+          <h2>Fluxo do time</h2>
+          <span class="legenda"><i class="ponto trabalhando"></i>trabalhando <i class="ponto concluida"></i>pronto <i class="ponto falhou"></i>falhou</span>
+        </div>
+        <div class="palco" id="palco">
+          <svg id="linhas" aria-hidden="true"></svg>
+          <div id="nos"></div>
+        </div>
+      </div>
+      <div class="cartao missao" id="missao">
+        <div class="vazio">
+          <img src="marca.png" alt="" />
+          <p>Mande um comando e acompanhe aqui o Coordenador distribuindo o trabalho.</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="coluna direita">
+      <div class="cartao aovivo">
+        <div class="cabeca">
+          <h2>Ao vivo</h2>
+          <button class="botao mini fantasma" id="limparFiltro" type="button" hidden>Ver todos</button>
+        </div>
+        <ol id="feed"></ol>
+      </div>
+    </aside>
+  </main>
+
+  <dialog id="janelaEntrega" class="janela">
+    <div class="cabeca">
+      <h2 id="tituloEntrega">Entrega</h2>
+      <div class="linha">
+        <button class="botao mini fantasma" id="copiarEntrega" type="button">Copiar</button>
+        <button class="botao mini fantasma" data-fechar type="button">Fechar</button>
+      </div>
+    </div>
+    <article class="md" id="conteudoEntrega"></article>
+  </dialog>
+
+  <dialog id="janelaConfig" class="janela">
+    <form id="formConfig" method="dialog">
+      <div class="cabeca">
+        <h2>Configurações</h2>
+        <button class="botao mini fantasma" data-fechar type="button">Fechar</button>
+      </div>
+      <p class="nota">No modo <b>IA automática</b>, cada agente tenta os motores na ordem dele. Se um motor bater o limite, ele fica em pausa até liberar e o próximo assume sozinho.</p>
+      <fieldset>
+        <legend><label><input type="checkbox" name="omniroute.ativo" /> OmniRoute</label></legend>
+        <label>Endereço <input name="omniroute.url" placeholder="http://localhost:20128/v1" /></label>
+        <label>Modelo padrão <input name="omniroute.modelo" list="modelosOmniroute" placeholder="auto" /></label>
+        <datalist id="modelosOmniroute"></datalist>
+        <small id="statusOmniroute" class="dica"></small>
+      </fieldset>
+      <fieldset>
+        <legend><label><input type="checkbox" name="claude.ativo" /> Claude (login do Claude Code)</label></legend>
+        <label>Modelo <input name="claude.modelo" placeholder="padrão do seu plano (ex.: sonnet, opus)" /></label>
+      </fieldset>
+      <fieldset>
+        <legend><label><input type="checkbox" name="codex.ativo" /> Codex (login do Codex)</label></legend>
+        <label>Modelo <input name="codex.modelo" placeholder="padrão do seu plano" /></label>
+      </fieldset>
+      <label class="solto">Pasta de conhecimento (pode ser seu cofre do Obsidian) <input name="conhecimento" placeholder="vazio = pasta contexto do squad. Ex.: C:\Users\Renato\Documents\Obsidian\Origo" /></label>
+      <label class="solto">Agentes trabalhando ao mesmo tempo <input name="paralelo" type="number" min="1" max="6" /></label>
+      <div class="linha fim">
+        <button class="botao principal" id="salvarConfig" type="button">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
