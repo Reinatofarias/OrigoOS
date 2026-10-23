@@ -1,8 +1,10 @@
-// Imagens de verdade: o agente escreve um bloco ```imagem com o prompt e o squad gera o arquivo
-// pelo OmniRoute (endpoint /images/generations, compatível com OpenAI), salvando em
-// entregas/<missão>/imagens/. O bloco vira a imagem no Markdown da entrega.
+// Imagens de verdade: o agente escreve um bloco ```imagem com o prompt e o squad gera o arquivo,
+// salvando em entregas/<missão>/imagens/. O bloco vira a imagem no Markdown da entrega.
+// Primeiro tenta o OmniRoute (modelo de imagem, endpoint /images/generations); se não tiver,
+// usa o Codex (gerador de imagem do plano do ChatGPT).
 import fs from "node:fs";
 import path from "node:path";
+import { gerarImagemCodex } from "./motores.mjs";
 
 const PADRAO_IMAGEM = /image|imagen|dall-e|gpt-image|flux|sdxl|stable-diffusion|seedream|ideogram|recraft|midjourney/i;
 const TAMANHOS = new Set(["1024x1024", "1024x1536", "1536x1024", "1024x1792", "1792x1024", "512x512"]);
@@ -67,22 +69,53 @@ async function gerarUma(cliente, modelo, { prompt, tamanho }, sinal) {
 
 // Gera as imagens pedidas no texto e devolve o texto com cada bloco trocado pela imagem salva.
 // pastaMissao: caminho absoluto de entregas/<missão>; prefixo: nome do agente nos arquivos.
+function linhaImagem(rotulo, arquivo, caminho) {
+  return `![${rotulo}](imagens/${arquivo})\n\n*Arquivo: \`${caminho}\`*`;
+}
+
+// Copia para a missão as imagens que o Codex gerou sozinho durante a tarefa.
+export function trazerImagensCodex({ texto, arquivos, pastaMissao, prefixo, avisar }) {
+  if (!arquivos?.length) return { texto, imagens: [] };
+  const pasta = path.join(pastaMissao, "imagens");
+  fs.mkdirSync(pasta, { recursive: true });
+  const imagens = arquivos.slice(0, 12).map((origem, i) => {
+    const arquivo = `${prefixo}-codex-${i + 1}${path.extname(origem).toLowerCase()}`;
+    const caminho = path.join(pasta, arquivo);
+    fs.copyFileSync(origem, caminho);
+    avisar({ tipo: "imagem", texto: `Imagem salva: ${caminho}`, arquivo: `imagens/${arquivo}` });
+    return { arquivo: `imagens/${arquivo}`, caminho, prompt: "", modelo: "Codex" };
+  });
+  const galeria = imagens.map((im, i) => linhaImagem(`Imagem ${i + 1}`, path.basename(im.arquivo), im.caminho)).join("\n\n");
+  return { texto: `${texto}\n\n## Imagens geradas\n\n${galeria}`, imagens };
+}
+
 export async function gerarImagens({ texto, pastaMissao, prefixo, config, avisar, sinal }) {
   const blocos = acharBlocosImagem(texto);
   if (!blocos.length) return { texto, imagens: [] };
-  if (config.omniroute?.ativo === false) {
-    avisar({ tipo: "troca", texto: "Tem imagem para gerar, mas o OmniRoute está desligado. Os prompts ficaram na entrega." });
+
+  // Escolhe quem desenha: OmniRoute com modelo de imagem, senão o Codex.
+  let gerar = null;
+  let quem = "";
+  if (config.omniroute?.ativo !== false && config.omniroute?.modeloImagem !== "codex") {
+    try {
+      const { default: OpenAI } = await import("openai");
+      const cliente = new OpenAI({ baseURL: config.omniroute.url, apiKey: process.env.OMNIROUTE_KEY || "sem-chave", maxRetries: 1 });
+      const modelo = await escolherModelo(cliente, config);
+      gerar = (b) => gerarUma(cliente, modelo, b, sinal);
+      quem = modelo;
+    } catch (erro) {
+      avisar({ tipo: "troca", texto: `OmniRoute sem imagem (${(erro?.message || String(erro)).slice(0, 140)}). Vou desenhar com o Codex.` });
+    }
+  }
+  if (!gerar && config.codex?.ativo !== false) {
+    gerar = (b) => gerarImagemCodex({ prompt: b.prompt, tamanho: b.tamanho, config, avisar, sinal });
+    quem = "Codex";
+  }
+  if (!gerar) {
+    avisar({ tipo: "erro", texto: "Não tenho onde gerar imagens (OmniRoute sem modelo de imagem e Codex desligado). Os prompts ficaram na entrega." });
     return { texto, imagens: [] };
   }
-  const { default: OpenAI } = await import("openai");
-  const cliente = new OpenAI({ baseURL: config.omniroute.url, apiKey: process.env.OMNIROUTE_KEY || "sem-chave", maxRetries: 1 });
-  let modelo;
-  try {
-    modelo = await escolherModelo(cliente, config);
-  } catch (erro) {
-    avisar({ tipo: "erro", texto: `Não deu para gerar imagens: ${erro?.message || erro}. Os prompts ficaram na entrega.` });
-    return { texto, imagens: [] };
-  }
+
   const pasta = path.join(pastaMissao, "imagens");
   fs.mkdirSync(pasta, { recursive: true });
   const imagens = [];
@@ -90,13 +123,13 @@ export async function gerarImagens({ texto, pastaMissao, prefixo, config, avisar
   for (const [i, b] of blocos.entries()) {
     if (sinal?.aborted) break;
     const arquivo = `${prefixo}-${nomeSeguro(b.nome, i)}.png`;
-    avisar({ tipo: "ferramenta", texto: `Gerando imagem ${i + 1} de ${blocos.length} com ${modelo}` });
+    avisar({ tipo: "ferramenta", texto: `Gerando imagem ${i + 1} de ${blocos.length} com ${quem}` });
     try {
-      const dados = await gerarUma(cliente, modelo, b, sinal);
+      const dados = await gerar(b);
       fs.writeFileSync(path.join(pasta, arquivo), dados);
       const caminho = path.join(pasta, arquivo);
-      imagens.push({ arquivo: `imagens/${arquivo}`, caminho, prompt: b.prompt, modelo });
-      saida = saida.replace(b.bruto, `![${b.nome || arquivo}](imagens/${arquivo})\n\n*Arquivo: \`${caminho}\`*`);
+      imagens.push({ arquivo: `imagens/${arquivo}`, caminho, prompt: b.prompt, modelo: quem });
+      saida = saida.replace(b.bruto, linhaImagem(b.nome || arquivo, arquivo, caminho));
       avisar({ tipo: "imagem", texto: `Imagem salva: ${caminho}`, arquivo: `imagens/${arquivo}` });
     } catch (erro) {
       avisar({ tipo: "erro", texto: `Imagem ${i + 1} falhou (${(erro?.message || String(erro)).slice(0, 160)}). O prompt ficou na entrega.` });

@@ -91,7 +91,10 @@ export function alterarAgendamento(id, mudancas) {
   if (typeof mudancas.ativo === "boolean") a.ativo = mudancas.ativo;
   if (typeof mudancas.comando === "string" && mudancas.comando.trim()) a.comando = mudancas.comando.trim();
   if (/^([01]\d|2[0-3]):[0-5]\d$/.test(mudancas.hora || "")) a.hora = mudancas.hora;
-  if (Array.isArray(mudancas.dias)) a.dias = mudancas.dias.map(Number).filter((d) => d >= 0 && d <= 6);
+  if (Array.isArray(mudancas.dias)) a.dias = [...new Set(mudancas.dias.map(Number).filter((d) => d >= 0 && d <= 6))].sort();
+  if ("data" in mudancas) a.data = typeof mudancas.data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(mudancas.data) ? mudancas.data : null;
+  if (a.data) a.dias = [];
+  if (mudancas.hora || "data" in mudancas) a.ultimaVez = a.data ? null : a.ultimaVez; // nova data: pode rodar de novo
   a.quando = descreverQuando(a);
   salvarTodos(lista);
   return a;

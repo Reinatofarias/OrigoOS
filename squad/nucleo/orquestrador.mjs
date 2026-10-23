@@ -7,7 +7,7 @@ import { DADOS, ENTREGAS } from "./caminhos.mjs";
 import { carregarAgentes, especialistas } from "./agentes.mjs";
 import { lerConfig, lerContexto } from "./config.mjs";
 import { rodarAgente } from "./motores.mjs";
-import { gerarImagens, instrucaoImagens } from "./imagens.mjs";
+import { gerarImagens, instrucaoImagens, trazerImagensCodex } from "./imagens.mjs";
 import { criarAgendamento } from "./agenda.mjs";
 import { origoConectado, lerContextoOrigo, instrucaoOrigo, separarBloco, enviarParaOrigo } from "./origoos.mjs";
 
@@ -282,8 +282,10 @@ async function executar(missao) {
           });
           const separado = separarBloco(r.texto);
           const { pacote } = separado;
-          const { texto, imagens } = await gerarImagens({ texto: separado.texto, pastaMissao: pasta, prefixo: t.agente, config, avisar: avisoDe(t.agente), sinal: controle.signal });
-          t.imagens = imagens;
+          const pedidas = await gerarImagens({ texto: separado.texto, pastaMissao: pasta, prefixo: t.agente, config, avisar: avisoDe(t.agente), sinal: controle.signal });
+          const doCodex = trazerImagensCodex({ texto: pedidas.texto, arquivos: r.imagensGeradas, pastaMissao: pasta, prefixo: t.agente, avisar: avisoDe(t.agente) });
+          const texto = doCodex.texto;
+          t.imagens = [...pedidas.imagens, ...doCodex.imagens];
           t.resultado = texto;
           t.motor = r.motor;
           t.modelo = r.modelo;

@@ -6,7 +6,7 @@
   <title>Origo Squad</title>
   <link rel="icon" href="icone.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="estilo.css" />
 </head>
 <body>
@@ -38,6 +38,13 @@
         </div>
         <small class="dica">Ctrl + Enter envia</small>
       </form>
+      <div class="cartao rotinas">
+        <div class="cabeca">
+          <h2>Rotinas</h2>
+          <button class="botao mini fantasma" id="novaRotina" type="button">Nova</button>
+        </div>
+        <ul id="listaRotinas"></ul>
+      </div>
       <div class="cartao historico">
         <h2>Missões</h2>
         <ul id="listaMissoes"></ul>
@@ -85,6 +92,62 @@
     <article class="md" id="conteudoEntrega"></article>
   </dialog>
 
+  <dialog id="janelaImagem" class="janela">
+    <div class="cabeca">
+      <h2 id="tituloImagem">Imagem</h2>
+      <div class="linha">
+        <button class="botao mini fantasma" id="copiarCaminho" type="button">Copiar caminho</button>
+        <a class="botao mini fantasma" id="baixarImagem" download>Baixar</a>
+        <button class="botao mini fantasma" data-fechar type="button">Fechar</button>
+      </div>
+    </div>
+    <img id="imagemGrande" class="imagemGrande" alt="" />
+    <code id="caminhoImagem" class="caminho"></code>
+  </dialog>
+
+  <dialog id="janelaEditar" class="janela">
+    <form id="formEditar" method="dialog">
+      <div class="cabeca">
+        <h2>Editar pedido</h2>
+        <button class="botao mini fantasma" data-fechar type="button">Fechar</button>
+      </div>
+      <p class="nota">O time faz a missão de novo com o pedido corrigido. A missão antiga continua no histórico.</p>
+      <textarea id="textoEditado" rows="6"></textarea>
+      <div class="linha fim">
+        <button class="botao principal" id="enviarEdicao" type="button">Refazer missão</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="janelaRotina" class="janela">
+    <form id="formRotina" method="dialog">
+      <div class="cabeca">
+        <h2 id="tituloRotina">Nova rotina</h2>
+        <button class="botao mini fantasma" data-fechar type="button">Fechar</button>
+      </div>
+      <p class="nota">Dica: você também pode pedir no campo de comando, do seu jeito. Ex.: <i>"toda segunda às 8h, monte minhas prioridades da semana"</i>.</p>
+      <label class="solto">O que o time faz <textarea id="rotinaComando" rows="3" placeholder="Ex.: Traga 10 leads de clínicas odontológicas em Recife com WhatsApp"></textarea></label>
+      <div class="linha">
+        <label class="solto">Hora <input id="rotinaHora" type="time" value="08:00" /></label>
+        <label class="solto">Quando
+          <select id="rotinaRepete">
+            <option value="todo">Todo dia</option>
+            <option value="uteis">Segunda a sexta</option>
+            <option value="dias">Dias escolhidos</option>
+            <option value="uma">Uma vez só</option>
+          </select>
+        </label>
+      </div>
+      <div class="dias" id="rotinaDias">
+        <label><input type="checkbox" value="1" />Seg</label><label><input type="checkbox" value="2" />Ter</label><label><input type="checkbox" value="3" />Qua</label><label><input type="checkbox" value="4" />Qui</label><label><input type="checkbox" value="5" />Sex</label><label><input type="checkbox" value="6" />Sáb</label><label><input type="checkbox" value="0" />Dom</label>
+      </div>
+      <label class="solto" id="rotinaDataCampo">Data <input id="rotinaData" type="date" /></label>
+      <div class="linha fim">
+        <button class="botao principal" id="salvarRotina" type="button">Salvar rotina</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="janelaConfig" class="janela">
     <form id="formConfig" method="dialog">
       <div class="cabeca">
@@ -96,6 +159,7 @@
         <legend><label><input type="checkbox" name="omniroute.ativo" /> OmniRoute</label></legend>
         <label>Endereço <input name="omniroute.url" placeholder="http://localhost:20128/v1" /></label>
         <label>Modelo padrão <select name="omniroute.modelo" data-modelos="padrao"></select></label>
+        <label>Modelo de imagem <select name="omniroute.modeloImagem"></select></label>
         <small id="statusOmniroute" class="dica"></small>
       </fieldset>
       <fieldset>

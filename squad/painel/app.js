@@ -23,6 +23,8 @@ const estado = {
   atual: null, // missão aberta, com log
   filtro: null, // id do agente filtrado no feed
   escrevendo: {}, // agente -> trecho do texto que está saindo agora
+  rotinas: [],
+  editandoRotina: null, // id da rotina aberta na janela, ou null para nova
 };
 
 // ---------- utilidades ----------
@@ -52,16 +54,28 @@ async function api(caminho, opcoes = {}) {
   return dados;
 }
 
+// Endereço de um arquivo das entregas (Markdown ou imagem) servido pelo squad.
+function urlEntrega(caminho) {
+  return `/api/entrega?arquivo=${encodeURIComponent(caminho)}`;
+}
+
 // Markdown simples e seguro (o texto é escapado antes de virar HTML).
+// base: pasta da missão, para as imagens geradas (imagens/arquivo.png) aparecerem.
+let baseImagens = "";
 function inline(t) {
   return t
+    .replace(/!\[([^\]]*)\]\((imagens\/[^\s)]+)\)/g, (_, alt, src) => {
+      const caminho = `${baseImagens}/${src}`;
+      return `<button type="button" class="miniatura grande" data-imagem="${esc(caminho)}" title="${alt}"><img src="${urlEntrega(caminho)}" alt="${alt}" loading="lazy" /></button>`;
+    })
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
     .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
 }
-function markdown(fonte) {
+function markdown(fonte, base = "") {
+  baseImagens = base;
   const linhas = esc(fonte || "").split(/\r?\n/);
   const saida = [];
   let i = 0;
@@ -234,10 +248,22 @@ function desenharLista() {
     .map(
       (m) => `<li><button type="button" data-missao="${esc(m.id)}" class="${estado.atual?.id === m.id ? "ativa" : ""}">
         <span class="t">${esc(m.texto)}</span>
-        <small><span class="selo ${m.status}">${ROTULOS[m.status] || m.status}</span>${quando(m.criadaEm)}</small>
+        <small><span class="selo ${m.status}">${ROTULOS[m.status] || m.status}</span>${m.origem === "rotina" ? `<span class="selo rotina">rotina</span>` : ""}${quando(m.criadaEm)}</small>
       </button></li>`,
     )
     .join("");
+}
+
+function miniatura(caminho, absoluto) {
+  return `<button type="button" class="miniatura" data-imagem="${esc(caminho)}" data-caminho="${esc(absoluto || "")}" title="${esc(absoluto || caminho)}"><img src="${urlEntrega(caminho)}" alt="" loading="lazy" /></button>`;
+}
+function origemMissao(m) {
+  if (m.origem === "rotina") {
+    const r = estado.rotinas.find((x) => x.id === m.rotina);
+    return `<p class="origem">Rodou sozinha pela rotina${r ? ` "${esc(r.quando)}"` : ""}</p>`;
+  }
+  if (m.origem === "edicao" && m.refazDe) return `<p class="origem">Pedido corrigido de <button type="button" class="link" data-missao="${esc(m.refazDe)}">outra missão</button></p>`;
+  return "";
 }
 
 function desenharMissao() {
@@ -250,11 +276,15 @@ function desenharMissao() {
       const a = estado.porId[t.agente] || { cor: "#22c7ff" };
       const motor = t.motor ? ` · ${esc(estado.nomesMotores[t.motor] || t.motor)}${t.modelo && t.modelo !== t.motor ? ` (${esc(t.modelo)})` : ""}` : "";
       const botao = t.arquivo ? `<button type="button" class="botao mini fantasma" data-arquivo="${esc(t.arquivo)}" data-titulo="${esc(t.nome)}">Ver entrega</button>` : "";
+      const imagens = (t.imagens || []).length
+        ? `<div class="galeria">${t.imagens.map((im) => miniatura(`${m.pasta}/${im.arquivo}`, im.caminho)).join("")}</div>`
+        : "";
       return `<div class="tarefa" style="--cor:${esc(a.cor)}">
         <div class="topo-t"><strong>${esc(t.nome)}</strong><span class="selo ${t.status}">${ROTULOS[t.status] || t.status}</span></div>
         <p>${esc(t.tarefa)}</p>
         <small>${t.inicio ? duracao(t.inicio, t.fim) : ""}${motor}</small>
         ${t.erro ? `<small style="color:var(--bad)">${esc(t.erro.slice(0, 220))}</small>` : ""}
+        ${imagens}
         ${botao}
       </div>`;
     })
@@ -262,14 +292,81 @@ function desenharMissao() {
   el.innerHTML = `
     <div class="cabeca"><h2>Missão · ${quando(m.criadaEm)}</h2><span class="selo ${m.status}">${ROTULOS[m.status] || m.status}</span></div>
     <h3>${esc(m.texto)}</h3>
+    ${origemMissao(m)}
     ${m.entendi ? `<p class="entendi">${esc(m.entendi)}</p>` : rodando ? `<p class="entendi">O Coordenador está montando o plano…</p>` : ""}
     ${tarefas ? `<div class="tarefas">${tarefas}</div>` : ""}
-    ${m.resposta ? `<div class="resposta md">${markdown(m.resposta)}</div>` : ""}
+    ${m.resposta ? `<div class="resposta md">${markdown(m.resposta, m.pasta)}</div>` : ""}
     <div class="acoes">
       ${rodando ? `<button type="button" class="botao perigo mini" id="parar">Parar missão</button>` : ""}
       ${m.pasta && (m.tarefas || []).some((t) => t.arquivo) ? `<button type="button" class="botao fantasma mini" id="abrirPasta">Abrir pasta das entregas</button>` : ""}
+      ${!rodando ? `<button type="button" class="botao fantasma mini" id="editarPedido">Editar pedido e refazer</button>` : ""}
       ${!rodando ? `<button type="button" class="botao fantasma mini" id="repetir">Usar este comando de novo</button>` : ""}
     </div>`;
+}
+
+// ---------- rotinas ----------
+const NOMES_DIAS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+function desenharRotinas() {
+  const el = $("#listaRotinas");
+  if (!estado.rotinas.length) {
+    el.innerHTML = `<li class="dica">Nenhuma rotina. Peça do seu jeito, ex.: "toda segunda às 8h, monte minha semana".</li>`;
+    return;
+  }
+  el.innerHTML = estado.rotinas
+    .map((r) => {
+      const proxima = r.ativo && r.proxima ? `próxima: ${quando(r.proxima)}` : r.ativo ? "sem próxima data" : "pausada";
+      return `<li class="${r.ativo ? "" : "pausada"}">
+        <button type="button" class="corpo" data-rotina="${esc(r.id)}" title="Editar rotina">
+          <span class="t">${esc(r.comando)}</span>
+          <small><span class="selo ${r.ativo ? "concluida" : "parada"}">${esc(r.quando)}</span>${esc(proxima)}</small>
+        </button>
+        <div class="linha">
+          <button type="button" class="botao mini fantasma" data-rodar-rotina="${esc(r.id)}" title="Rodar agora">Rodar</button>
+          <button type="button" class="botao mini fantasma" data-pausar-rotina="${esc(r.id)}">${r.ativo ? "Pausar" : "Ligar"}</button>
+          <button type="button" class="botao mini perigo" data-apagar-rotina="${esc(r.id)}" title="Apagar rotina">×</button>
+        </div>
+      </li>`;
+    })
+    .join("");
+}
+
+function abrirRotina(id) {
+  const r = estado.rotinas.find((x) => x.id === id);
+  estado.editandoRotina = r ? r.id : null;
+  $("#tituloRotina").textContent = r ? "Editar rotina" : "Nova rotina";
+  $("#rotinaComando").value = r?.comando || "";
+  $("#rotinaHora").value = r?.hora || "08:00";
+  const dias = r?.dias || [];
+  $("#rotinaRepete").value = r?.data ? "uma" : !dias.length || dias.length === 7 ? "todo" : dias.join() === "1,2,3,4,5" ? "uteis" : "dias";
+  for (const c of $("#rotinaDias").querySelectorAll("input")) c.checked = dias.includes(Number(c.value));
+  $("#rotinaData").value = r?.data || new Date().toLocaleDateString("en-CA");
+  ajustarFormRotina();
+  $("#janelaRotina").showModal();
+  $("#rotinaComando").focus();
+}
+function ajustarFormRotina() {
+  const tipo = $("#rotinaRepete").value;
+  $("#rotinaDias").hidden = tipo !== "dias";
+  $("#rotinaDataCampo").hidden = tipo !== "uma";
+}
+$("#rotinaRepete").addEventListener("change", ajustarFormRotina);
+
+async function salvarRotina(botao) {
+  const tipo = $("#rotinaRepete").value;
+  const dias = tipo === "uteis" ? [1, 2, 3, 4, 5] : tipo === "dias" ? [...$("#rotinaDias").querySelectorAll("input:checked")].map((c) => Number(c.value)) : [];
+  if (tipo === "dias" && !dias.length) return alert("Escolha pelo menos um dia.");
+  const dados = { comando: $("#rotinaComando").value.trim(), hora: $("#rotinaHora").value, dias, data: tipo === "uma" ? $("#rotinaData").value : null };
+  if (!dados.comando) return $("#rotinaComando").focus();
+  botao.disabled = true;
+  try {
+    if (estado.editandoRotina) await api(`/api/agendamentos/${encodeURIComponent(estado.editandoRotina)}`, { method: "POST", body: JSON.stringify({ ...dados, ativo: true }) });
+    else await api("/api/agendamentos", { method: "POST", body: JSON.stringify({ ...dados, motor: $("#motor").value }) });
+    $("#janelaRotina").close();
+  } catch (erro) {
+    alert(erro.message);
+  } finally {
+    botao.disabled = false;
+  }
 }
 
 // ---------- feed ao vivo ----------
@@ -277,7 +374,8 @@ function desenharMissao() {
 const noFeed = (ev) => ev.tipo !== "motor" && (!estado.filtro || ev.agente === estado.filtro);
 function itemFeed(ev) {
   const a = estado.porId[ev.agente] || { nome: ev.agente, cor: "#9ea2c8" };
-  return `<li class="${esc(ev.tipo)}" style="--cor:${esc(a.cor)}"><i></i><div><b>${esc(a.nome)}</b><time>${hora(ev.quando)}</time><span>${esc(ev.texto)}</span></div></li>`;
+  const foto = ev.tipo === "imagem" && ev.arquivo && estado.atual?.pasta ? miniatura(`${estado.atual.pasta}/${ev.arquivo}`, ev.texto.replace(/^Imagem salva: /, "")) : "";
+  return `<li class="${esc(ev.tipo)}" style="--cor:${esc(a.cor)}"><i></i><div><b>${esc(a.nome)}</b><time>${hora(ev.quando)}</time><span>${esc(ev.texto)}</span>${foto}</div></li>`;
 }
 function desenharFeed() {
   const log = (estado.atual?.log || []).filter(noFeed);
@@ -287,6 +385,7 @@ function desenharFeed() {
 
 function tudo() {
   desenharMotores();
+  desenharRotinas();
   desenharFluxo();
   desenharLista();
   desenharMissao();
@@ -345,6 +444,10 @@ function conectar() {
     }
     desenharLista();
   });
+  fonte.addEventListener("agendamentos", (e) => {
+    estado.rotinas = JSON.parse(e.data);
+    desenharRotinas();
+  });
   fonte.onerror = () => {
     for (const p of document.querySelectorAll(".pilula")) p.title = "Sem conexão com o servidor do squad";
   };
@@ -378,6 +481,38 @@ document.addEventListener("click", async (e) => {
   const alvo = e.target.closest("button");
   if (!alvo) return;
   if (alvo.dataset.missao) return abrirMissao(alvo.dataset.missao);
+  if (alvo.dataset.imagem) return abrirImagem(alvo.dataset.imagem, alvo.dataset.caminho);
+  if (alvo.dataset.rotina) return abrirRotina(alvo.dataset.rotina);
+  if (alvo.dataset.rodarRotina) {
+    const m = await api(`/api/agendamentos/${encodeURIComponent(alvo.dataset.rodarRotina)}/rodar`, { method: "POST" }).catch((erro) => alert(erro.message));
+    if (m?.id) {
+      if (!estado.missoes.some((x) => x.id === m.id)) estado.missoes.unshift(m);
+      estado.atual = { ...m, log: [] };
+      tudo();
+    }
+    return;
+  }
+  if (alvo.dataset.pausarRotina) {
+    const r = estado.rotinas.find((x) => x.id === alvo.dataset.pausarRotina);
+    return api(`/api/agendamentos/${encodeURIComponent(r.id)}`, { method: "POST", body: JSON.stringify({ ativo: !r.ativo }) }).catch((erro) => alert(erro.message));
+  }
+  if (alvo.dataset.apagarRotina) {
+    if (!confirm("Apagar esta rotina?")) return;
+    return api(`/api/agendamentos/${encodeURIComponent(alvo.dataset.apagarRotina)}`, { method: "DELETE" }).catch((erro) => alert(erro.message));
+  }
+  if (alvo.id === "novaRotina") return abrirRotina(null);
+  if (alvo.id === "salvarRotina") return salvarRotina(alvo);
+  if (alvo.id === "editarPedido" && estado.atual) {
+    $("#textoEditado").value = estado.atual.texto;
+    $("#janelaEditar").showModal();
+    return $("#textoEditado").focus();
+  }
+  if (alvo.id === "enviarEdicao" && estado.atual) return refazerMissao(alvo);
+  if (alvo.id === "copiarCaminho") {
+    await navigator.clipboard.writeText($("#caminhoImagem").textContent);
+    alvo.textContent = "Copiado";
+    return setTimeout(() => (alvo.textContent = "Copiar caminho"), 1500);
+  }
   if (alvo.dataset.agente) {
     estado.filtro = estado.filtro === alvo.dataset.agente ? null : alvo.dataset.agente;
     desenharFluxo();
@@ -387,7 +522,7 @@ document.addEventListener("click", async (e) => {
     const r = await fetch(`/api/entrega?arquivo=${encodeURIComponent(alvo.dataset.arquivo)}`);
     const texto = await r.text();
     $("#tituloEntrega").textContent = alvo.dataset.titulo || "Entrega";
-    $("#conteudoEntrega").innerHTML = markdown(texto);
+    $("#conteudoEntrega").innerHTML = markdown(texto, alvo.dataset.arquivo.split(/[\\/]/).slice(0, -1).join("/"));
     $("#conteudoEntrega").dataset.fonte = texto;
     return $("#janelaEntrega").showModal();
   }
@@ -412,6 +547,34 @@ document.addEventListener("click", async (e) => {
   if (alvo.id === "salvarConfig") return salvarConfig(alvo);
 });
 
+function abrirImagem(caminho, absoluto) {
+  const url = urlEntrega(caminho);
+  $("#tituloImagem").textContent = caminho.split("/").pop();
+  $("#imagemGrande").src = url;
+  $("#baixarImagem").href = url;
+  $("#baixarImagem").download = caminho.split("/").pop();
+  $("#caminhoImagem").textContent = absoluto || caminho;
+  $("#janelaImagem").showModal();
+}
+
+async function refazerMissao(botao) {
+  const texto = $("#textoEditado").value.trim();
+  if (!texto) return $("#textoEditado").focus();
+  botao.disabled = true;
+  try {
+    const m = await api(`/api/missao/${encodeURIComponent(estado.atual.id)}/editar`, { method: "POST", body: JSON.stringify({ texto }) });
+    $("#janelaEditar").close();
+    if (!estado.missoes.some((x) => x.id === m.id)) estado.missoes.unshift(m);
+    estado.atual = { ...m, log: [] };
+    estado.filtro = null;
+    tudo();
+  } catch (erro) {
+    alert(erro.message);
+  } finally {
+    botao.disabled = false;
+  }
+}
+
 // ---------- configurações ----------
 function campos() {
   return [...$("#formConfig").querySelectorAll("input[name], select[name]")];
@@ -424,6 +587,12 @@ function opcoesModelo(select, modelos, atual, rotuloVazio) {
 function preencherModelos(modelos) {
   const c = estado.config;
   opcoesModelo($("#formConfig [name='omniroute.modelo']"), modelos, c.omniroute?.modelo || "auto");
+  const imagem = $("#formConfig [name='omniroute.modeloImagem']");
+  const deImagem = modelos.filter((m) => /image|imagen|dall-e|flux|sdxl|stable-diffusion|seedream|ideogram|recraft|midjourney/i.test(m));
+  imagem.innerHTML = [["auto", "auto (o primeiro modelo de imagem, senão o Codex)"], ["codex", "Só o Codex (plano do ChatGPT)"], ...deImagem.map((m) => [m, m])]
+    .map(([v, r]) => `<option value="${esc(v)}">${esc(r)}</option>`)
+    .join("");
+  imagem.value = c.omniroute?.modeloImagem || "auto";
   const padrao = c.omniroute?.modelo || "auto";
   $("#modelosAgentes").innerHTML = estado.agentes
     .map((a) => `<span style="color:${esc(a.cor)}">${esc(a.nome)}</span><select name="agentes.${esc(a.id)}.modelo"></select>`)
@@ -483,6 +652,7 @@ async function iniciar() {
   estado.nomesMotores = dados.nomesMotores;
   estado.config = dados.config;
   estado.missoes = dados.missoes;
+  estado.rotinas = dados.agendamentos || [];
   tudo();
   if (estado.missoes[0]) await abrirMissao(estado.missoes[0].id);
   conectar();

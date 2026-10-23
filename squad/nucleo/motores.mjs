@@ -4,6 +4,9 @@
 //  - codex: Codex pelo login oficial, com busca na web
 // A escolha é automática: segue a ordem do agente, pula motor desligado ou em pausa por limite
 // e passa para o próximo quando um falha.
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import OpenAI from "openai";
 import { RAIZ } from "./caminhos.mjs";
 
@@ -159,6 +162,28 @@ async function rodarClaude({ agente, sistema, tarefa, config, avisar, sinal }) {
 }
 
 // ---------- Codex (login oficial do Codex) ----------
+// O Codex gera imagens sozinho (skill $imagegen) e guarda em ~/.codex/generated_images.
+// O squad olha essa pasta antes e depois de cada tarefa para trazer as imagens novas.
+const PASTA_IMAGENS_CODEX = path.join(process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), "generated_images");
+
+function fotografarImagensCodex() {
+  const vistos = new Map();
+  const andar = (pasta) => {
+    if (!fs.existsSync(pasta)) return;
+    for (const item of fs.readdirSync(pasta, { withFileTypes: true })) {
+      const completo = path.join(pasta, item.name);
+      if (item.isDirectory()) andar(completo);
+      else if (/\.(png|jpe?g|webp)$/i.test(item.name)) vistos.set(completo, fs.statSync(completo).mtimeMs);
+    }
+  };
+  andar(PASTA_IMAGENS_CODEX);
+  return vistos;
+}
+
+function imagensNovasCodex(antes) {
+  const depois = fotografarImagensCodex();
+  return [...depois].filter(([arquivo, quando]) => antes.get(arquivo) !== quando).sort((a, b) => a[1] - b[1]).map(([arquivo]) => arquivo);
+}
 async function rodarCodex({ agente, sistema, tarefa, config, avisar, sinal }) {
   const { Codex } = await import("@openai/codex-sdk");
   const codex = new Codex({ env: ambienteLimpo(["OPENAI_BASE_URL"]) });
@@ -171,6 +196,7 @@ async function rodarCodex({ agente, sistema, tarefa, config, avisar, sinal }) {
     model: config.codex.modelo || undefined,
   });
   avisar({ tipo: "status", texto: "Pensando com Codex" });
+  const antes = fotografarImagensCodex();
   const { events } = await conversa.runStreamed(`${sistema}\n\n---\n\nTAREFA:\n${tarefa}`, { signal: sinal });
   let texto = "";
   for await (const ev of events) {
@@ -196,7 +222,7 @@ async function rodarCodex({ agente, sistema, tarefa, config, avisar, sinal }) {
     }
   }
   if (!texto.trim()) throw new Error("Codex terminou sem resposta");
-  return { texto, modelo: config.codex.modelo || "Codex" };
+  return { texto, modelo: config.codex.modelo || "Codex", imagensGeradas: imagensNovasCodex(antes) };
 }
 
 const RODAR = { omniroute: rodarOmniroute, claude: rodarClaude, codex: rodarCodex };
@@ -233,6 +259,27 @@ export async function rodarAgente({ agente, sistema, tarefa, config, forcar, avi
     }
   }
   throw new Error(`Todos os motores falharam. ${falhas.join(" | ")}`);
+}
+
+// Gera uma imagem só com o Codex (plano do ChatGPT), quando o OmniRoute não tem modelo de imagem.
+export async function gerarImagemCodex({ prompt, tamanho, config, avisar, sinal }) {
+  const { Codex } = await import("@openai/codex-sdk");
+  const codex = new Codex({ env: ambienteLimpo(["OPENAI_BASE_URL"]) });
+  const conversa = codex.startThread({ workingDirectory: RAIZ, skipGitRepoCheck: true, sandboxMode: "read-only", approvalPolicy: "never", model: config.codex.modelo || undefined });
+  const antes = fotografarImagensCodex();
+  const formato = tamanho === "1024x1024" ? "quadrada" : tamanho === "1536x1024" ? "horizontal" : "vertical";
+  const { events } = await conversa.runStreamed(`$imagegen Gere UMA imagem ${formato} (${tamanho}) com este prompt, sem perguntar nada e sem mover o arquivo:\n\n${prompt}`, { signal: sinal });
+  for await (const ev of events) {
+    if (ev.type === "turn.failed") throw new Error(`Codex: ${ev.error.message}`);
+    if (ev.type === "error" && !/^Reconnecting/i.test(ev.message)) {
+      if (pareceLimite(ev.message)) marcar("codex", { estado: "pausado", ate: Date.now() + 30 * MINUTO, motivo: ev.message });
+      throw new Error(`Codex: ${ev.message}`);
+    }
+    if (ev.type === "item.started" && ev.item.type === "command_execution") avisar({ tipo: "ferramenta", texto: "Codex desenhando a imagem" });
+  }
+  const novas = imagensNovasCodex(antes);
+  if (!novas.length) throw new Error("o Codex não gerou a imagem");
+  return fs.readFileSync(novas.at(-1));
 }
 
 export async function listarModelosOmniroute(config) {
