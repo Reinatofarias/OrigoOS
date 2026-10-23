@@ -10,7 +10,7 @@ export const PADRAO = {
   paralelo: 3,
   // Pasta de conhecimento lida por todos os agentes (pode ser um cofre do Obsidian). Vazio = squad/contexto.
   conhecimento: "",
-  omniroute: { ativo: true, url: "http://localhost:20128/v1", modelo: "auto" },
+  omniroute: { ativo: true, url: "http://localhost:20128/v1", modelo: "auto", modeloImagem: "auto" },
   claude: { ativo: true, modelo: "" },
   codex: { ativo: true, modelo: "" },
   // Modelo do OmniRoute escolhido no painel para cada agente: { prospector: { modelo: "..." } }

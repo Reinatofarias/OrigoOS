@@ -49,6 +49,16 @@ Para desligar, feche a janela preta.
 Em qualquer uma das duas, cole a chave no arquivo `squad\.env`, na linha `OMNIROUTE_KEY=`.
 No painel do squad, em **Configurações**, a lista de modelos do OmniRoute aparece sozinha.
 
+## Imagens
+
+O Conteúdo e o Tráfego pedem imagens com um bloco ```imagem na entrega. O squad gera a imagem pelo OmniRoute e salva o `.png` em `entregas\<missão>\imagens\`. Na entrega, o bloco vira a imagem com o caminho do arquivo.
+Para isso, o OmniRoute precisa ter um provedor com modelo de imagem conectado. O squad escolhe sozinho o primeiro modelo de imagem que achar (por exemplo `gpt-image`, `imagen`, `flux`), ou o que você escolher em Configurações. Se não der para gerar, o prompt fica na entrega para você usar em outro lugar. Para um agente novo pedir imagens, use `imagens: true` no cabeçalho dele.
+
+## Rotinas (agendar por prompt)
+
+Peça ao squad do seu jeito, por exemplo "toda segunda às 8h, monte minhas prioridades da semana" ou "amanhã às 9h, traga 10 leads de odonto em Recife". O Coordenador cria a rotina, e ela fica salva em `dados\agendamentos.json`.
+As rotinas só rodam com o squad aberto. Se o computador estava desligado na hora, a rotina roda quando o squad abrir (até 12 horas depois).
+
 ## Conexão com o Origo OS
 
 A parte comercial (clientes, funil de leads e tarefas) fica no Origo OS, na Vercel. O squad roda aqui e conversa com ele:

@@ -8,12 +8,13 @@ import { carregarEnv, lerConfig, salvarConfig } from "./nucleo/config.mjs";
 import { carregarAgentes } from "./nucleo/agentes.mjs";
 import { saudeMotores, observarSaude, listarModelosOmniroute, verificarOmniroute, NOMES } from "./nucleo/motores.mjs";
 import { eventos, criarMissao, listarMissoes, lerMissao, pararMissao } from "./nucleo/orquestrador.mjs";
+import { listarAgendamentos, criarAgendamento, alterarAgendamento, apagarAgendamento, proximaOcorrencia, iniciarRelogio } from "./nucleo/agenda.mjs";
 
 carregarEnv();
 const config = lerConfig();
 const PORTA = Number(process.env.PORTA || config.porta || 4321);
 const PAINEL = path.join(RAIZ, "painel");
-const TIPOS = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml" };
+const TIPOS = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".md": "text/markdown; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml" };
 
 const clientes = new Set();
 function transmitir(tipo, dados) {
@@ -23,6 +24,14 @@ function transmitir(tipo, dados) {
 eventos.on("evento", (ev) => transmitir("evento", ev));
 eventos.on("missao", (m) => transmitir("missao", resumoMissao(m)));
 observarSaude((s) => transmitir("motores", s));
+eventos.on("agendamentos", () => transmitir("agendamentos", agendamentosPublicos()));
+
+function agendamentosPublicos() {
+  return listarAgendamentos().map((a) => {
+    const p = proximaOcorrencia(a);
+    return { ...a, proxima: p ? new Date(p).toISOString() : null };
+  });
+}
 
 function resumoMissao(m) {
   const { log, ...resto } = m;
@@ -59,7 +68,7 @@ const servidor = http.createServer(async (req, res) => {
       return;
     }
     if (url.pathname === "/api/estado") {
-      return json(res, 200, { agentes: agentesPublicos(), motores: saudeMotores(), nomesMotores: NOMES, config: lerConfig(), temChaveOmniroute: Boolean(process.env.OMNIROUTE_KEY), missoes: listarMissoes().slice(0, 40).map(resumoMissao) });
+      return json(res, 200, { agentes: agentesPublicos(), motores: saudeMotores(), nomesMotores: NOMES, config: lerConfig(), agendamentos: agendamentosPublicos(), temChaveOmniroute: Boolean(process.env.OMNIROUTE_KEY), missoes: listarMissoes().slice(0, 40).map(resumoMissao) });
     }
     if (url.pathname === "/api/missao" && req.method === "POST") {
       const { texto, motor } = await corpo(req);
@@ -72,14 +81,43 @@ const servidor = http.createServer(async (req, res) => {
         pararMissao(id);
         return json(res, 200, { ok: true });
       }
+      // Corrigir o pedido: cria uma missão nova com o texto editado (a antiga fica no histórico).
+      if (url.pathname.endsWith("/editar") && req.method === "POST") {
+        const antiga = lerMissao(id);
+        if (!antiga) return json(res, 404, { erro: "Missão não encontrada" });
+        const { texto, motor } = await corpo(req);
+        const novo = (texto ?? antiga.texto).trim();
+        if (!novo) return json(res, 400, { erro: "Escreva o comando" });
+        return json(res, 200, resumoMissao(criarMissao(novo, { motor: motor || antiga.motor, origem: "edicao", refazDe: antiga.id })));
+      }
       const missao = lerMissao(id);
       return missao ? json(res, 200, missao) : json(res, 404, { erro: "Missão não encontrada" });
     }
+    // Arquivos das entregas: o Markdown e as imagens geradas (entregas/<missão>/imagens/*.png).
     if (url.pathname === "/api/entrega") {
       const alvo = path.resolve(ENTREGAS, url.searchParams.get("arquivo") || "");
-      if (!alvo.startsWith(ENTREGAS + path.sep) || !fs.existsSync(alvo)) return json(res, 404, { erro: "Arquivo não encontrado" });
-      res.writeHead(200, { "content-type": "text/markdown; charset=utf-8" });
+      if (!alvo.startsWith(ENTREGAS + path.sep) || !fs.existsSync(alvo) || fs.statSync(alvo).isDirectory()) return json(res, 404, { erro: "Arquivo não encontrado" });
+      res.writeHead(200, { "content-type": TIPOS[path.extname(alvo).toLowerCase()] || "application/octet-stream" });
       return res.end(fs.readFileSync(alvo));
+    }
+    if (url.pathname === "/api/agendamentos" && req.method === "GET") {
+      return json(res, 200, agendamentosPublicos());
+    }
+    if (url.pathname === "/api/agendamentos" && req.method === "POST") {
+      const a = criarAgendamento(await corpo(req));
+      eventos.emit("agendamentos");
+      return json(res, 200, a);
+    }
+    if (url.pathname.startsWith("/api/agendamentos/")) {
+      const id = decodeURIComponent(url.pathname.split("/")[3] || "");
+      if (req.method === "DELETE" || url.pathname.endsWith("/apagar")) apagarAgendamento(id);
+      else if (url.pathname.endsWith("/rodar") && req.method === "POST") {
+        const a = listarAgendamentos().find((x) => x.id === id);
+        if (!a) return json(res, 404, { erro: "Rotina não encontrada" });
+        return json(res, 200, resumoMissao(criarMissao(a.comando, { motor: a.motor, origem: "rotina", rotina: a.id })));
+      } else if (req.method === "POST") alterarAgendamento(id, await corpo(req));
+      eventos.emit("agendamentos");
+      return json(res, 200, { ok: true });
     }
     if (url.pathname === "/api/abrir-pasta" && req.method === "POST") {
       const { pasta } = await corpo(req);
@@ -116,6 +154,10 @@ const servidor = http.createServer(async (req, res) => {
 });
 
 verificarOmniroute(lerConfig());
+iniciarRelogio(
+  (a) => criarMissao(a.comando, { motor: a.motor, origem: "rotina", rotina: a.id }),
+  () => eventos.emit("agendamentos"),
+);
 setInterval(() => verificarOmniroute(lerConfig()), 60_000);
 
 // Só no próprio computador: ninguém da rede acessa o painel.

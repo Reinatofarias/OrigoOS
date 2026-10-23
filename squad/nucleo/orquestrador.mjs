@@ -7,6 +7,8 @@ import { DADOS, ENTREGAS } from "./caminhos.mjs";
 import { carregarAgentes, especialistas } from "./agentes.mjs";
 import { lerConfig, lerContexto } from "./config.mjs";
 import { rodarAgente } from "./motores.mjs";
+import { gerarImagens, instrucaoImagens } from "./imagens.mjs";
+import { criarAgendamento } from "./agenda.mjs";
 import { origoConectado, lerContextoOrigo, instrucaoOrigo, separarBloco, enviarParaOrigo } from "./origoos.mjs";
 
 export const eventos = new EventEmitter();
@@ -69,6 +71,7 @@ function sistemaDe(agente, contexto, origo) {
     contexto ? `# Contexto da Origo Company\n\n${contexto}` : "",
     origo ? (verLeads ? origo.comLeads : origo.geral) : "",
     origo ? instrucaoOrigo(agente.origoOs) : "",
+    agente.imagens ? instrucaoImagens() : "",
     "Responda sempre em português do Brasil.",
   ]
     .filter(Boolean)
@@ -103,13 +106,18 @@ Responda SOMENTE com um JSON neste formato:
 {
   "entendi": "uma frase dizendo o que você entendeu do pedido",
   "tarefas": [ { "agente": "id do especialista", "tarefa": "tarefa completa e autossuficiente para ele" } ],
-  "resposta_direta": "preencha só quando não precisar de nenhum especialista"
-}`;
+  "resposta_direta": "preencha só quando não precisar de nenhum especialista",
+  "agendamento": null
+}
+
+Se o Renato pedir para repetir ou programar algo ("todo dia", "toda segunda", "amanhã às 9h", "de segunda a sexta"), preencha "agendamento" assim:
+{ "comando": "o pedido completo que o squad deve executar em cada vez, escrito como se o Renato pedisse na hora", "hora": "HH:MM", "dias": [0 a 6, onde 0 é domingo; vazio = todo dia], "data": "AAAA-MM-DD só quando for uma vez só" }
+Nesse caso, deixe "tarefas" vazio, a não ser que ele também peça para fazer agora.`;
 }
 
 function pedidoDeResumo(texto, tarefas) {
   const partes = tarefas
-    .map((t) => `## ${t.nome}\nTarefa: ${t.tarefa}\n\n${t.status === "concluida" ? (t.resultado || "").slice(0, 8000) : `Não concluiu: ${t.erro}`}${t.origo ? `\n\n${t.origo}` : ""}`)
+    .map((t) => `## ${t.nome}\nTarefa: ${t.tarefa}\n\n${t.status === "concluida" ? (t.resultado || "").slice(0, 8000) : `Não concluiu: ${t.erro}`}${t.origo ? `\n\n${t.origo}` : ""}${t.imagens?.length ? `\n\nImagens geradas: ${t.imagens.map((i) => i.caminho).join(", ")}` : ""}`)
     .join("\n\n");
   return `O Renato pediu:\n"""${texto}"""\n\nO time entregou:\n\n${partes}\n\nEscreva para o Renato uma resposta curta (até 12 linhas): o que foi feito, o principal de cada entrega e o próximo passo que ele deve dar. Não repita as entregas inteiras, elas já estão salvas em arquivos.`;
 }
@@ -159,10 +167,11 @@ function guardarPendente(pacote) {
   fs.writeFileSync(path.join(pasta, `${Date.now()}.json`), JSON.stringify(pacote, null, 2));
 }
 
-export function criarMissao(texto, { motor = "auto" } = {}) {
+// origem: "painel", "rotina" (agendada) ou "edicao" (pedido corrigido de outra missão, em refazDe).
+export function criarMissao(texto, { motor = "auto", origem = "painel", refazDe = null, rotina = null } = {}) {
   const criadaEm = agoraIso();
   const id = `${criadaEm.slice(0, 19).replace(/[:T]/g, "-")}-${slug(texto)}`;
-  const missao = { id, criadaEm, texto, motor, status: "planejando", entendi: "", tarefas: [], resposta: "", pasta: "", log: [] };
+  const missao = { id, criadaEm, texto, motor, origem, refazDe, rotina, status: "planejando", entendi: "", tarefas: [], resposta: "", pasta: "", log: [] };
   salvar(missao);
   executar(missao).catch(() => {});
   return missao;
@@ -234,6 +243,18 @@ async function executar(missao) {
         .filter((t) => agentes[t.agente] && t.agente !== "coordenador" && t.tarefa)
         .map((t) => ({ agente: t.agente, nome: agentes[t.agente].nome, tarefa: t.tarefa, status: "na_fila", motor: "", modelo: "", inicio: null, fim: null, arquivo: "", resultado: "", erro: "" }));
       if (!missao.tarefas.length) missao.resposta = json.resposta_direta || json.entendi || plano.texto;
+      if (json.agendamento?.comando) {
+        try {
+          const a = criarAgendamento({ ...json.agendamento, motor: missao.motor });
+          missao.agendamento = a.id;
+          eventos.emit("agendamentos");
+          const aviso = `Rotina criada: ${a.quando}, o squad vai fazer "${a.comando}". Ela aparece em Rotinas, onde dá para pausar ou apagar.`;
+          if (!missao.tarefas.length) missao.resposta = aviso;
+          emitir({ agente: "coordenador", tipo: "agenda", texto: aviso });
+        } catch (erro) {
+          emitir({ agente: "coordenador", tipo: "erro", texto: `Não consegui criar a rotina: ${erro?.message || erro}` });
+        }
+      }
     }
     emitir({ agente: "coordenador", tipo: "fim", motor: plano.motor, texto: missao.tarefas.length ? `Plano pronto: ${missao.tarefas.map((t) => t.nome).join(", ")}` : "Respondi direto" });
     missao.status = missao.tarefas.length ? "em_andamento" : "concluida";
@@ -259,7 +280,10 @@ async function executar(missao) {
             avisar: avisoDe(t.agente),
             sinal: controle.signal,
           });
-          const { texto, pacote } = separarBloco(r.texto);
+          const separado = separarBloco(r.texto);
+          const { pacote } = separado;
+          const { texto, imagens } = await gerarImagens({ texto: separado.texto, pastaMissao: pasta, prefixo: t.agente, config, avisar: avisoDe(t.agente), sinal: controle.signal });
+          t.imagens = imagens;
           t.resultado = texto;
           t.motor = r.motor;
           t.modelo = r.modelo;
