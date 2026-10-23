@@ -37,6 +37,8 @@ export function carregarAgentes() {
         .filter(Boolean),
       modeloOmniroute: dados.modelo_omniroute || "",
       precisaWeb: dados.precisa_web === true,
+      origoOs: dados.origo_os || "",
+      imagens: dados.imagens === true,
       instrucoes: corpo,
     };
   }
